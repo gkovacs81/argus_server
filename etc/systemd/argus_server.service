@@ -1,0 +1,18 @@
+[Unit] 
+Description=Argus webapplication 
+After=network.target 
+ 
+[Service] 
+Type=simple 
+User=argus 
+Group=www-data 
+PIDFile=/var/run/argus/argus_server.pid 
+WorkingDirectory=/home/argus/server 
+ExecStart=/home/argus/server/scripts/start_server.sh prod 
+ExecReload=/bin/kill -s HUP $MAINPID 
+ExecStop=/bin/kill -s TERM $MAINPID 
+Restart=on-failure 
+PrivateTmp=true 
+ 
+[Install] 
+WantedBy=multi-user.target

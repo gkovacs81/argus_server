@@ -1,0 +1,29 @@
+pytz
+gpiozero
+flask
+python-jose
+psycopg2-binary
+Flask-SQLAlchemy
+Flask-Migrate
+Flask-Script
+
+werkzeug
+jinja2
+itsdangerous
+click
+Crypto
+pycrypto
+ecdsa
+python-crontab
+
+# monitor socket io
+python-socketio
+eventlet
+
+python-gsmmodem-new
+
+gunicorn
+
+# DNS updates
+noipy
+pydbus

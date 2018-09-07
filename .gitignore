@@ -1,0 +1,9 @@
+.directory
+*.tar.gz
+*.pyc
+__pycache__
+
+/pyenv/
+/migrations/
+/dist/
+/monitoring.log
