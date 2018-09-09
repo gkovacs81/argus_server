@@ -1,6 +1,6 @@
 # Server part
 
-It has three components:
+It has two components:
 
 * server: hosting the webapplication and implementing REST API
 * monitor: handling of sensors, syren, GSM/email communication
