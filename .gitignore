@@ -3,7 +3,8 @@
 *.pyc
 __pycache__
 
-/pyenv/
-/migrations/
 /dist/
+/migrations/
+/pyenv/
+/tmp/
 /monitoring.log
