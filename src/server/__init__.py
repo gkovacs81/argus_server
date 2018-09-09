@@ -90,7 +90,7 @@ def authenticate():
 
 @app.route('/api/alerts', methods=['GET'])
 @authenticated()
-def alerts():
+def get_alerts():
     # app.logger.debug("Request: %s", request.args.get('alerting'))
     return jsonify([i.serialize for i in Alert.query.order_by(Alert.start_time.desc())])
 
@@ -185,7 +185,8 @@ def sensor(sensor_id):
         sensor.deleted = True
         db.session.commit()
         ipc_client = IPCClient()
-        return jsonify(ipc_client.update_configuration())
+        ipc_client.update_configuration()
+        return jsonify(True)
     elif request.method == 'PUT':
         sensor = Sensor.query.get(sensor_id)
         if sensor.update(request.json):
@@ -204,13 +205,13 @@ def sensortypes():
     return jsonify([i.serialize for i in SensorType.query.all()])
 
 
-@app.route('/api/sensor/getAlert', methods=['GET'])
+@app.route('/api/sensor/alert', methods=['GET'])
 @authenticated()
 def get_sensor_alert():
     if request.args.get('sensor_id'):
-        return 'true' if Sensor.query.filter_by(id=request.args.get('sensor_id'), alert=True).first() else 'false'
+        return jsonify(Sensor.query.filter_by(id=request.args.get('sensor_id'), alert=True).first() is not None)
     else:
-        return 'true' if Sensor.query.filter_by(alert=True).first() else 'false'
+        return jsonify(Sensor.query.filter_by(alert=True).first() is not None)
 
 
 @app.route('/api/zones/', methods=['GET', 'POST'])
@@ -242,7 +243,8 @@ def zone(zone_id):
         zone.deleted = True
         db.session.commit()
         ipc_client = IPCClient()
-        return jsonify(ipc_client.update_configuration())
+        ipc_client.update_configuration()
+        return jsonify(True)
     elif request.method == 'PUT':
         zone = Zone.query.get(zone_id)
         if zone.update(request.json):
@@ -252,23 +254,16 @@ def zone(zone_id):
         return jsonify(zone.serialize)
 
 
-@app.route('/api/monitoring/getArm', methods=['GET'])
+@app.route('/api/monitoring/arm', methods=['GET'])
 @authenticated()
 def get_arm():
     ipc_client = IPCClient()
     return jsonify(ipc_client.get_arm())
 
 
-@app.route('/api/monitoring/getState', methods=['GET'])
-@authenticated()
-def get_status():
-    ipc_client = IPCClient()
-    return jsonify(ipc_client.get_state())
-
-
 @app.route('/api/monitoring/arm', methods=['PUT'])
 @authenticated(check_permissions=False)
-def arm():
+def put_arm():
     ipc_client = IPCClient()
     return jsonify(ipc_client.arm(request.args.get('type')))
 
@@ -277,6 +272,13 @@ def arm():
 @authenticated(check_permissions=False)
 def disarm():
     return jsonify(IPCClient().disarm())
+
+
+@app.route('/api/monitoring/state', methods=['GET'])
+@authenticated()
+def get_state():
+    ipc_client = IPCClient()
+    return jsonify(ipc_client.get_state())
 
 
 @app.route('/api/config/<string:option>/<string:section>', methods=['GET', 'PUT'])
