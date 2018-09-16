@@ -14,6 +14,7 @@ source scripts/install.sh
 . ./$PYENV/bin/activate
 
 if [ "$1" == "dev" ]; then
+  printenv
   $PYENV/bin/python3 -s -m flask run -h $SERVER_HOST -p $SERVER_PORT
 elif [ "$1" == "prod" ]; then
   PYTHONUNBUFFERED=1 gunicorn \

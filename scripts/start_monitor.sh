@@ -13,8 +13,8 @@ source scripts/install.sh
 
 . ./$PYENV/bin/activate
 
-
 if [ "$1" == "dev" ]; then
+  printenv
   # create file with path and set permissions
   install -Dv /dev/null $MONITOR_INPUT_SOCKET
   chown -R $USER:$USER $MONITOR_INPUT_SOCKET
