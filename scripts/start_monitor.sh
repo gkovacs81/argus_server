@@ -23,6 +23,5 @@ elif [ "$1" == "prod" ]; then
   # create file with path and set permissions
   install -Dv /dev/null $MONITOR_INPUT_SOCKET
   chown -R argus:argus $MONITOR_INPUT_SOCKET
-  printenv
   PYTHONPATH=src $PYENV/bin/python3 -u -s -m monitoring.__main__
 fi
