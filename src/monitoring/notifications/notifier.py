@@ -95,21 +95,25 @@ class Notifier(Thread):
         self._logger.info("New message: %s", message)
         success = False
         has_subscription = False
-        if self._options["subscriptions"]['sms'][message['type']]:
-            if message['type'] == ALERT_STARTED:
-                has_subscription = True
-                success |= self.notify_alert_started_SMS(message)
-            elif message['type'] == ALERT_STOPPED:
-                has_subscription = True
-                success |= self.notify_alert_stopped_SMS(message)
-
-        if self._options["subscriptions"]['email'][message['type']]:
-            if message['type'] == ALERT_STARTED:
-                has_subscription = True
-                success |= self.notify_alert_started_email(message)
-            elif message['type'] == ALERT_STOPPED:
-                has_subscription = True
-                success |= self.notify_alert_stopped_email(message)
+        try:
+            if self._options["subscriptions"]['sms'][message['type']]:
+                if message['type'] == ALERT_STARTED:
+                    has_subscription = True
+                    success |= self.notify_alert_started_SMS(message)
+                elif message['type'] == ALERT_STOPPED:
+                    has_subscription = True
+                    success |= self.notify_alert_stopped_SMS(message)
+    
+            if self._options["subscriptions"]['email'][message['type']]:
+                if message['type'] == ALERT_STARTED:
+                    has_subscription = True
+                    success |= self.notify_alert_started_email(message)
+                elif message['type'] == ALERT_STOPPED:
+                    has_subscription = True
+                    success |= self.notify_alert_stopped_email(message)
+        except KeyError:
+            self._logger.info("No subscription configured!")
+            pass
 
         return not (not success and has_subscription)
 
