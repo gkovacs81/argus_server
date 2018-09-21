@@ -10,6 +10,7 @@ from os.path import isfile, join
 import jose.exceptions
 import functools
 
+from server.version import __version__
 from monitoring.constants import ARM_AWAY, ARM_STAY, MONITOR_ARM_AWAY, MONITOR_ARM_STAY, \
     ROLE_USER
 from server.ipc import IPCClient
@@ -309,6 +310,10 @@ def option(option, section):
 
         return jsonify(True)
 
+
+@app.route('/api/version', methods=['GET'])
+def version():
+    return __version__
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')

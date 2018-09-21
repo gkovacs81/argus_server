@@ -3,6 +3,7 @@
 *.pyc
 __pycache__
 
+/src/server/version.py
 /dist/
 /migrations/
 /pyenv/
