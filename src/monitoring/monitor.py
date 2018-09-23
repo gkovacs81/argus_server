@@ -202,7 +202,7 @@ class Monitor(Thread):
 
     def save_sensor_references(self, references):
         for sensor in self._sensors:
-            sensor.reference_value = references[sensor.channel]
+            sensor.reference_value = references[sensor.channel-1]
             db.session.commit()
 
 
