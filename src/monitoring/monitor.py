@@ -229,6 +229,7 @@ class Monitor(Thread):
         found_alert = False
         for sensor in self._sensors:
             value = self._sensorAdapter.get_value(sensor.channel)
+            #self._logger.debug("Sensor({}): R:{} -> V:{}".format(sensor.channel, sensor.reference_value, value))
             if not isclose(value, sensor.reference_value, TOLERANCE):
                 if not sensor.alert:
                     self._logger.debug('Alert on channel: %s, (changed %s -> %s)', sensor.channel, sensor.reference_value, value)

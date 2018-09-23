@@ -19,6 +19,10 @@ MISO = 20
 MOSI = 16
 CS = [12, 1]
 
+# number of channels on MCP3008
+CHANNEL_COUNT=8
+
+# total number of channels on the board
 IO_NUMBER = int(os.environ["INPUT_NUMBER"])
 
 
@@ -35,11 +39,15 @@ class SensorAdapter(object):
         self._logger = logging.getLogger(LOG_ADSENSOR)
 
         for i in range(IO_NUMBER):
-            self._logger.debug("Channel ({:2} on BCM{:0>2}) creating...".format(i, CS[i//8]))
-            self._channels.append(MCP3008(channel=i, clock_pin=CLK, mosi_pin=MOSI, miso_pin=MISO, select_pin=CS[i//8]))
+            self._logger.debug("Channel ({:2}-{:2} on BCM{:0>2}) creating...".format(i+1, i%CHANNEL_COUNT+1, CS[i//CHANNEL_COUNT]))
+            self._channels.append(MCP3008(channel=i%CHANNEL_COUNT, clock_pin=CLK, mosi_pin=MOSI, miso_pin=MISO, select_pin=CS[i//CHANNEL_COUNT]))
 
     def get_value(self, channel):
-        return self._channels[channel].value
+        if 0 < channel < 15:
+            # channel numbering correction board numbering CH1..CH15 => array 0..14
+            return self._channels[channel-1].value
+        else:
+            return 0
 
     def get_values(self):
         values = []
