@@ -20,6 +20,8 @@ if [ "$1" == "dev" ] || [ "$1" == "demo" ]; then
   chown -R $USER:$USER $MONITOR_INPUT_SOCKET
   PYTHONPATH=src $PYENV/bin/python3 -s -m monitoring.__main__
 elif [ "$1" == "prod" ]; then
+  # update the system clock from RTC
+  /sbin/hwclock --hctosys >> /var/log/hwclock.log
   # create file with path and set permissions
   install -Dv /dev/null $MONITOR_INPUT_SOCKET
   chown -R argus:argus $MONITOR_INPUT_SOCKET

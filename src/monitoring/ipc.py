@@ -11,11 +11,12 @@ from os import path, makedirs, remove, environ, chmod, chown
 from threading import Thread
 
 from monitoring.constants import MONITOR_DISARM, MONITOR_UPDATE_CONFIG, MONITOR_ARM_AWAY, MONITOR_ARM_STAY,\
-    THREAD_IPC, LOG_IPC, MONITOR_UPDATE_DYNDNS
+    THREAD_IPC, LOG_IPC, MONITOR_UPDATE_DYNDNS, MONITOR_SYNC_CLOCK, MONITOR_SET_CLOCK
 from monitoring import storage
 from server.tools import enable_certbot_job, enable_dyndns_job
 from dyndns import update_ip
 from certificates import update_certificates
+from tools.clock import sync_clock, set_clock
 
 MONITOR_INPUT_SOCKET = environ['MONITOR_INPUT_SOCKET']
 
@@ -87,6 +88,11 @@ class IPCServer(Thread):
             # enable cron jobs for update configuration periodically
             enable_dyndns_job()
             enable_certbot_job()
+        elif message['action'] == MONITOR_SYNC_CLOCK:
+            sync_clock()
+        elif message['action'] == MONITOR_SET_CLOCK:
+            del message['action']
+            set_clock(message)
 
         return {'result':True}
 

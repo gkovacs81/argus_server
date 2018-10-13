@@ -12,6 +12,8 @@ MONITOR_DISARM = 'monitor_disarm'
 MONITOR_UPDATE_CONFIG = 'monitor_update_config'
 MONITOR_UPDATE_DYNDNS = 'monitor_update_dyndns'
 MONITOR_STOP = 'monitor_stop'
+MONITOR_SYNC_CLOCK = 'monitor_sync_clock'
+MONITOR_SET_CLOCK = 'monitor_set_clock'
 
 # arm types
 ARM_AWAY = 'away'

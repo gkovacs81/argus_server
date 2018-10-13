@@ -3,10 +3,12 @@ import os
 import re
 import socket
 
+from datetime import datetime as dt
 from flask import Flask, request, abort, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from jose import jwt
 from os.path import isfile, join
+
 import jose.exceptions
 import functools
 
@@ -15,6 +17,8 @@ from monitoring.constants import ARM_AWAY, ARM_STAY, MONITOR_ARM_AWAY, MONITOR_A
     ROLE_USER
 from server.ipc import IPCClient
 from server.tools import enable_certbot_job, enable_dyndns_job
+from tools.clock import gettime_ntp, gettime_hw, get_timezone
+from time import sleep
 
 argus_application_folder = os.path.join(os.getcwd(), os.environ.get('SERVER_STATIC_FOLDER', ''))
 
@@ -314,6 +318,40 @@ def option(option, section):
 @app.route('/api/version', methods=['GET'])
 def version():
     return __version__
+
+
+@app.route('/api/clock', methods=['GET'])
+#@authenticated()
+def get_clock():
+    result = {
+        'system': dt.now().isoformat(sep=' ')[:19],
+        'hw': gettime_hw(),
+        'timezone': get_timezone()
+    }
+
+    network = gettime_ntp()
+    if network:
+        result['network'] = network
+    else:
+        result['network'] = None
+
+    
+
+    return jsonify(result)
+
+@app.route('/api/clock', methods=['PUT'])
+def set_clock():
+    ipc_client = IPCClient()
+    ipc_client.set_clock(request.json)
+
+    return jsonify(True)
+
+@app.route('/api/clock/sync', methods=['PUT'])
+def sync_clock():
+    ipc_client = IPCClient()
+    ipc_client.sync_clock()
+
+    return jsonify(True)
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')

@@ -10,7 +10,7 @@ import socket
 from os import environ
 from monitoring.constants import MONITOR_DISARM, MONITOR_UPDATE_CONFIG,\
     MONITOR_ARM_AWAY, ARM_STAY, MONITOR_ARM_STAY, ARM_AWAY,\
-    MONITOR_UPDATE_DYNDNS
+    MONITOR_UPDATE_DYNDNS, MONITOR_SYNC_CLOCK, MONITOR_SET_CLOCK
 
 
 class IPCClient(object):
@@ -60,6 +60,18 @@ class IPCClient(object):
         return self._send_message({
             'action': MONITOR_UPDATE_DYNDNS
         })
+
+    def sync_clock(self):
+        return self._send_message({
+            'action': MONITOR_SYNC_CLOCK
+        })
+        
+    def set_clock(self, settings):
+        message = {
+            'action': MONITOR_SET_CLOCK
+        }
+        message = {**message, **settings}
+        return self._send_message(message)
 
     def _send_message(self, message):
         self._socket.send(json.dumps(message).encode())
