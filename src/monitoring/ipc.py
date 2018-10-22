@@ -25,14 +25,14 @@ class IPCServer(Thread):
     Class for handling the actions from the server and executing them on monitoring.
     '''
 
-    def __init__(self, stop_event, actions):
+    def __init__(self, stop_event, broadcaster):
         '''
         Constructor
         '''
         super(IPCServer, self).__init__(name=THREAD_IPC)
         self._logger = logging.getLogger(LOG_IPC)
         self._stop_event = stop_event
-        self._actions = actions
+        self._broadcaster = broadcaster
         self._initialize_socket()
         self._logger.info('IPC server created')
 
@@ -64,22 +64,22 @@ class IPCServer(Thread):
 
     def handle_actions(self, message):
         if message['action'] == MONITOR_ARM_AWAY:
-            self._actions.put(MONITOR_ARM_AWAY)
             self._logger.info('Action: arm AWAY')
+            self._broadcaster.send_message(MONITOR_ARM_AWAY)
         if message['action'] == MONITOR_ARM_STAY:
-            self._actions.put(MONITOR_ARM_STAY)
             self._logger.info('Action: arm STAY')
+            self._broadcaster.send_message(MONITOR_ARM_STAY)
         elif message['action'] == MONITOR_DISARM:
-            self._actions.put(MONITOR_DISARM)
             self._logger.info('Action: disarm')
+            self._broadcaster.send_message(MONITOR_DISARM)
         elif message['action'] == 'get_arm':
             arm = storage.get('arm')
             return {'type': arm}
         elif message['action'] == 'get_state':
             return {'state': storage.get('state')}
         elif message['action'] == MONITOR_UPDATE_CONFIG:
-            self._actions.put(MONITOR_UPDATE_CONFIG)
-            self._logger.info('Update configuration')
+            self._logger.info('Update configuration...')
+            self._broadcaster.send_message(MONITOR_UPDATE_CONFIG)
         elif message['action'] == MONITOR_UPDATE_DYNDNS:
             self._logger.info('Update dyndns...')
             # update configuration

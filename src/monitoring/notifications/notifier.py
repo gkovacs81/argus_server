@@ -8,9 +8,9 @@ from smtplib import SMTPException
 from threading import Thread
 
 from monitoring.notifications.templates import *
-from monitoring.notifications.queue import NotificationQueue
 from monitoring.constants import LOG_NOTIFIER, THREAD_NOTIFIER
 from models import Option
+from monitoring.constants import MONITOR_STOP, MONITOR_UPDATE_CONFIG
 
 if os.uname()[4][:3] == 'arm':
     from monitoring.adapters.gsm import GSM
@@ -61,38 +61,88 @@ options = {
 '''
 
 
-
 class Notifier(Thread):
+    MAX_RETRY = 5
+    RETRY_WAIT = 30
 
-    def __init__(self, stop_event):
+    _actions = None
+
+    @classmethod
+    def notify_alert_started(cls, alert_id, sensors, time):
+        cls._actions.put({
+            'type': ALERT_STARTED,
+            'id': alert_id,
+            'source': "argus113",
+            'sensors': sensors,
+            'time': time,
+        })
+
+    @classmethod
+    def notify_alert_stopped(cls, alert_id, time):
+        cls._actions.put({
+            'type': ALERT_STOPPED,
+            'id': alert_id,
+            'source': "argus113",
+            'time': time
+        })
+
+    def __init__(self):
         super(Notifier, self).__init__(name=THREAD_NOTIFIER)
-        self._queue = NotificationQueue.get_queue()
-        self._stop_event = stop_event
-        self._options = self.getOptions('Notifier')
         self._logger = logging.getLogger(LOG_NOTIFIER)
+        self._options = self.get_options()
         self._gsm = GSM()
+        self._messages = []
 
     def run(self):
-        self._logger.info("Notifier started...")
+        self._logger.info("Notifier started for subscriptions: {}".format(
+            self._options['subscriptions']))
         self._gsm.setup()
-        while not self._stop_event.is_set():
+        while True:
+            message = None
             try:
-                message = self._queue.get(timeout=1)
-                if not self.sendMessage(message):
-                    self._queue.put(message)
+                message = Notifier._actions.get(timeout=Notifier.RETRY_WAIT)
             except Empty:
+                #self._logger.debug("No message found")
                 pass
+
+            # handle actions or messages
+            if type(message) is str:
+                if message == MONITOR_STOP:
+                    break
+                elif message == MONITOR_UPDATE_CONFIG:
+                    self._options = self.get_options()
+                    self._gsm.destroy()
+                    self._gsm = GSM()
+                    self._gsm.setup()
+            elif not message is None:
+                message['retry'] = 0
+                self._messages.append(message)
+
+            # try to send the message but not forever
+            if len(self._messages) > 0:
+                message = self._messages[0]
+                if self.send_message(message):
+                    self._messages.pop(0)
+                else:
+                    message['retry'] += 1
+                    if message['retry'] >= Notifier.MAX_RETRY:
+                        self._logger.debug("Deleted message after max retry (%s): %s",
+                                           Notifier.MAX_RETRY, self._messages.pop(0))
+
         self._logger.info("Notifier stopped...")
 
-    def getOptions(self, section):
+    def get_options(self):
         options = {}
-        for section_name in ('email', 'gsm', 'subscription'):
-            section = Option.query.filter_by(name='notifications', section=section_name).first()
-            options[section_name] = json.loads(section.value) if section else ''
+        for section_name in ('email', 'gsm', 'subscriptions'):
+            section = Option.query.filter_by(
+                name='notifications', section=section_name).first()
+            options[section_name] = json.loads(
+                section.value) if section else ''
+        self._logger.info("Notifier loaded subscriptions: {}".format(options))
         return options
 
-    def sendMessage(self, message):
-        self._logger.info("New message: %s", message)
+    def send_message(self, message):
+        self._logger.info("Sending message: %s", message)
         success = False
         has_subscription = False
         try:
@@ -103,7 +153,7 @@ class Notifier(Thread):
                 elif message['type'] == ALERT_STOPPED:
                     has_subscription = True
                     success |= self.notify_alert_stopped_SMS(message)
-    
+
             if self._options["subscriptions"]['email'][message['type']]:
                 if message['type'] == ALERT_STARTED:
                     has_subscription = True
@@ -138,10 +188,13 @@ class Notifier(Thread):
             server = smtplib.SMTP('smtp.gmail.com:587')
             server.ehlo()
             server.starttls()
-            server.login(self._options['email']['smtp_username'], self._options['email']['smtp_password'])
+            server.login(self._options['email']['smtp_username'],
+                         self._options['email']['smtp_password'])
 
-            message = 'Subject: {}\n\n{}'.format(subject, content).encode(encoding='utf_8', errors='strict')
-            server.sendmail(from_addr='info@argus', to_addrs=self._options['email']['email_address'], msg=message)
+            message = 'Subject: {}\n\n{}'.format(subject, content).encode(
+                encoding='utf_8', errors='strict')
+            server.sendmail(
+                from_addr='info@argus', to_addrs=self._options['email']['email_address'], msg=message)
             server.quit()
         except SMTPException as error:
             self._logger.error("Can't send email %s ", error)
@@ -149,4 +202,3 @@ class Notifier(Thread):
 
         self._logger.info("Sent email")
         return True
-

@@ -8,9 +8,11 @@ import logging
 import os
 
 from gsmmodem.modem import GsmModem
-from gsmmodem.exceptions import PinRequiredError, IncorrectPinError, TimeoutException
+from gsmmodem.exceptions import PinRequiredError, IncorrectPinError, TimeoutException, CmsError,\
+    CommandError
 from monitoring.constants import LOG_ADGSM
 from models import Option
+from time import sleep
 
 
 class GSM(object):
@@ -31,21 +33,33 @@ class GSM(object):
                           self._options['port'],
                           self._options['baud'],
                           self._options['pin_code'])
-        try:
-            self._modem.connect(self._options['pin_code'], waitingForModemToStartInSeconds=10)
-            self._logger.debug("GSM modem connected")
-        except PinRequiredError:
-            self._logger.error('Error: SIM card PIN required. Please specify a PIN with the -p argument')
-            self._modem = None
-            return False
-        except IncorrectPinError:
-            self._logger.error('Error: Incorrect SIM card PIN entered')
-            self._modem = None
-            return False
-        except TimeoutException as error:
-            self._logger.error('Error: no answer from GSM module: %s', error)
-            self._modem = None
-            return False
+        
+        connected = False
+        while not connected:
+            try:
+                self._modem.connect(self._options['pin_code'], waitingForModemToStartInSeconds=10)
+                self._logger.debug("GSM modem connected")
+                connected = True
+            except PinRequiredError:
+                self._logger.error('SIM card PIN required!')
+                self._modem = None
+                return False
+            except IncorrectPinError:
+                self._logger.error('Incorrect SIM card PIN entered!')
+                self._modem = None
+                return False
+            except TimeoutException as error:
+                self._logger.error('No answer from GSM module: %s', error)
+                self._modem = None
+                return False
+            except CmsError as error:
+                if str(error) == "CMS 302":
+                    self._logger.debug('GSM modem not ready. Retry...')
+                    sleep(5)
+                else:
+                    self._logger.error('No answer from GSM module: %s', error)
+                    self._modem = None
+                    return False
 
     def destroy(self):
         self._modem.close()
@@ -63,6 +77,9 @@ class GSM(object):
         self._logger.debug('Checking for network coverage...')
         try:
             self._modem.waitForNetworkCoverage(5)
+        except CommandError as error:
+            self._logger.error('Command error: %s', error)
+            return False
         except TimeoutException:
             self._logger.error('Network signal strength is not sufficient, please adjust modem position/antenna and try again.')
             return False
@@ -72,5 +89,11 @@ class GSM(object):
             except TimeoutException:
                 self._logger.error('Failed to send message: the send operation timed out')
                 return False
+            except CmsError as error:
+                self._logger.error('Failed to send message: %s', error)
+                return False
             else:
                 self._logger.debug('Message sent.')
+                return True
+
+        return False

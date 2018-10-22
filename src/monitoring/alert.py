@@ -4,7 +4,6 @@ Created on 2017. szept. 13.
 @author: gkovacs
 '''
 
-import json
 import logging
 import pytz
 
@@ -19,7 +18,7 @@ from monitoring.constants import ARM_AWAY, ARM_STAY, ARM_DISARM,\
 from multiprocessing import Queue
 from queue import Empty 
 from monitoring import storage
-from monitoring.notifications import notify_alert_started, notify_alert_stopped
+from monitoring.notifications.notifier import Notifier
 
 
 SYREN_DEFAULT_ALERT_TIME = 5
@@ -124,7 +123,7 @@ class SyrenAlert(Thread):
             db.session.commit()
 
         send_alert_state(json.dumps(self._alert.serialize))
-        notify_alert_started(self._alert.id, list(map(lambda alert_sensor: alert_sensor.sensor.description, self._alert.sensors)), start_time)
+        Notifier.notify_alert_started(self._alert.id, list(map(lambda alert_sensor: alert_sensor.sensor.description, self._alert.sensors)), start_time)
 
     def stop_alert(self):
         with SyrenAlert._semaphore:
@@ -136,7 +135,7 @@ class SyrenAlert(Thread):
 
             send_alert_state(json.dumps(False))
             send_syren_state(None)
-            notify_alert_stopped(self._alert.id, self._alert.end_time)
+            Notifier.notify_alert_stopped(self._alert.id, self._alert.end_time)
 
     def handle_sensors(self):
         sensor_added = False
