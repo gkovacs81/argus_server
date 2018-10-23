@@ -62,7 +62,8 @@ class GSM(object):
                     return False
 
     def destroy(self):
-        self._modem.close()
+        if not self._modem is None:
+            self._modem.close()
 
     def sendSMS(self, phone_number, message):
         if not self._modem:
