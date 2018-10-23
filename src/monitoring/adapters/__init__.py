@@ -1,0 +1,4 @@
+# SPI bus BCM pins
+SPI_CLK = 21
+SPI_MISO = 20
+SPI_MOSI = 16

@@ -14,8 +14,13 @@ from eventlet.queue import Empty
 from models import *
 import monitoring.alert
 
-from monitoring.constants import *
+from monitoring.adapters.power import PowerAdapter
 from monitoring.adapters.sensor import SensorAdapter
+from monitoring.constants import THREAD_MONITOR, LOG_MONITOR, MONITORING_STARTUP,\
+    ARM_DISARM, MONITOR_STOP, MONITOR_ARM_AWAY, ARM_AWAY, MONITORING_ARMED,\
+    MONITOR_ARM_STAY, ARM_STAY, MONITOR_DISARM, MONITORING_READY,\
+    MONITOR_UPDATE_CONFIG, MONITORING_UPDATING_CONFIG, MONITORING_INVALID_CONFIG,\
+    MONITORING_SABOTAGE
 from monitoring.socket_io import send_system_state_change, send_sensors_state, \
     send_arm_state, send_alert_state, send_syren_state
 from monitoring import storage
@@ -45,16 +50,17 @@ class Monitor(Thread):
         super(Monitor, self).__init__(name=THREAD_MONITOR)
         self._logger = logging.getLogger(LOG_MONITOR)
         self._sensorAdapter = SensorAdapter()
+        self._powerAdapter = PowerAdapter()
         self._actions = actions
         self._sensors = None
-        self._alerts = {}
         self._db_alert = None
+        self._power_source = None
+        self._alerts = {}
         self._stop_alert = Event()
 
         self._logger.info('Monitoring created')
         storage.set('state', MONITORING_STARTUP)
         storage.set('arm', ARM_DISARM)
-
 
     def run(self):
         self._logger.info('Monitoring started')
@@ -104,11 +110,28 @@ class Monitor(Thread):
             except Empty:
                 pass
 
+            self.check_power()
             self.scan_sensors()
             self.handle_alerts()
 
         self._stop_alert.set()
         self._logger.info("Monitoring stopped")
+
+
+    def check_power(self):
+        # load the value once fron the adapter
+        new_power_source = self._powerAdapter.source_type
+        if new_power_source == PowerAdapter.SOURCE_BATTERY and self._power_source is None:
+            self._logger.info("System works from battery")
+        elif new_power_source == PowerAdapter.SOURCE_NETWORK and self._power_source is None:
+            self._logger.info("System works from network")
+        elif new_power_source == PowerAdapter.SOURCE_BATTERY and \
+            self._power_source == PowerAdapter.SOURCE_NETWORK:
+            self._logger.info("Power outage started!")
+        elif new_power_source == PowerAdapter.SOURCE_NETWORK and \
+            self._power_source == PowerAdapter.SOURCE_BATTERY:
+            self._logger.info("Power outage ended!")
+        self._power_source = new_power_source 
 
 
     def validate_sensor_config(self):
@@ -202,7 +225,7 @@ class Monitor(Thread):
 
     def save_sensor_references(self, references):
         for sensor in self._sensors:
-            sensor.reference_value = references[sensor.channel-1]
+            sensor.reference_value = references[sensor.channel - 1]
             db.session.commit()
 
 
@@ -232,7 +255,8 @@ class Monitor(Thread):
             #self._logger.debug("Sensor({}): R:{} -> V:{}".format(sensor.channel, sensor.reference_value, value))
             if not isclose(value, sensor.reference_value, TOLERANCE):
                 if not sensor.alert:
-                    self._logger.debug('Alert on channel: %s, (changed %s -> %s)', sensor.channel, sensor.reference_value, value)
+                    self._logger.debug('Alert on channel: %s, (changed %s -> %s)',
+                                       sensor.channel, sensor.reference_value, value)
                     sensor.alert = True
                     changes = True
             else:
