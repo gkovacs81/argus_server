@@ -7,6 +7,7 @@ Created on 2017. aug. 28.
 import logging
 import os
 
+from monitoring.adapters import SYREN_OUT
 from monitoring.constants import LOG_ADSYREN
 
 if os.uname()[4][:3] == 'arm':
@@ -27,7 +28,7 @@ class SyrenAdapter(object):
         self._channels = []
         self._logger = logging.getLogger(LOG_ADSYREN)
         self._is_alerting = False
-        self._output = DigitalOutputDevice(pin=23)
+        self._output = DigitalOutputDevice(pin=SYREN_OUT)
 
 
     def alert(self, start=True):
