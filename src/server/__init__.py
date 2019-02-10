@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 import socket
@@ -365,9 +366,9 @@ def catch_all(path):
     else:
         compress = False
 
-    # detect language
+    # detect language from url path (en|hu)
     result = re.search('(' + '|'.join(os.environ['LANGUAGES'].split(' ')) + ')', path)
-    language = result.group(0) if result else None
+    language = result.group(0) if result else ''
 
     # app.logger.debug("Language: %s / %s", language, os.environ['LANGUAGES'])
     if language == 'en':
@@ -376,6 +377,7 @@ def catch_all(path):
     # app.logger.debug("FALLBACK for path: %s", path)
 
     # return with file if exists
+    # app.logger.error("Checking for %s or %s", join(argus_application_folder, path), join(argus_application_folder, language, 'index.html'))
     if isfile(join(argus_application_folder, path)):
         # app.logger.debug("Path exists! %s", path)
         response = app.send_static_file(path)
@@ -390,3 +392,7 @@ def catch_all(path):
     # app.logger.debug("INDEX")
     return app.send_static_file('index.html')
 
+if __name__ != '__main__':
+    gunicorn_logger = logging.getLogger('gunicorn.error')
+    app.logger.handlers = gunicorn_logger.handlers
+    app.logger.setLevel(gunicorn_logger.level)
