@@ -22,6 +22,7 @@ elif [ "$1" == "prod" ]; then
     --umask 0117 \
     --error-logfile - \
     --capture-output \
+    --log-level=debug \
     --pid $RESOURCE_PATH/argus_server.pid \
     --bind unix:$RESOURCE_PATH/argus_server.sock \
     server:app
