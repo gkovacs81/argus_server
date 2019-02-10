@@ -35,17 +35,20 @@ class PatternBasedMockMCP3008(object):
         self._channel = channel
         self._logger = logging.getLogger(LOG_ADSENSOR)
         self._starttime = None
-        self._alert_source = None
+        self._alert_source = []
+        # clock
         self.i = 0
 
     @property
     def value(self):
         try:
-            #print("Values: %s / %s" % (self._alert_source, self._channel))
+            # print("Values: %s / %s" % (self._alert_source, self._channel))
             value = self._alert_source[self.i][self._channel]
-        except (KeyError, TypeError):
+        except (KeyError, TypeError, IndexError):
             value = 0
+            self._logger.warn("No value for channel=%s on clock=%s in %s!", self._channel, self.i, self.__class__)
 
+        # step clock
         self.i += 1
         if self. i == len(self._alert_source):
             self.i = 0
