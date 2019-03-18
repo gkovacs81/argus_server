@@ -175,29 +175,31 @@ class Alert(BaseModel):
         return {
             'id' : self.id,
             'arm_type': self.arm_type,
-            'start_time' : self.start_time.strftime('%c'),
-            'end_time': self.end_time.strftime('%c') if self.end_time else '',
+            'start_time' : self.start_time.replace(microsecond=0, tzinfo=None).isoformat(sep=' '),
+            'end_time': self.end_time.replace(microsecond=0, tzinfo=None).isoformat(sep=' ') if self.end_time else '',
             'sensors' : [
                 {
                     'id': alert_sensor.sensor_id,
                     'channel': alert_sensor.channel,
+                    'type_id': alert_sensor.type_id,
                     'description':alert_sensor.description
                 }
                 for alert_sensor in self.sensors]
         }
-
 
 class AlertSensor(BaseModel):
     __tablename__ = 'alert_sensor'
     alert_id = db.Column(db.Integer, db.ForeignKey('alert.id'), primary_key=True)
     sensor_id = db.Column(db.Integer, db.ForeignKey('sensor.id'), primary_key=True)
     channel = db.Column(db.Integer)
+    type_id = db.Column(db.Integer, db.ForeignKey('sensor_type.id'), nullable=False)
     description = db.Column(db.String)
     sensor = db.relationship('Sensor', back_populates='alerts')
     alert = db.relationship('Alert', back_populates='sensors')
 
-    def __init__(self, channel, description):
+    def __init__(self, channel, type_id, description):
         self.channel = channel
+        self.type_id = type_id
         self.description = description
 
 

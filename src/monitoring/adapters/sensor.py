@@ -14,7 +14,7 @@ if os.uname()[4][:3] == 'arm':
     from gpiozero import MCP3008
 else:
     #from monitoring.adapters.mock import TimeBasedMockMCP3008 as MCP3008
-    from monitoring.adapters.mock.MCP3008 import ShortAlertMCP3008 as MCP3008
+    from monitoring.adapters.mock.MCP3008 import DoubleAlertMCP3008 as MCP3008
 
 
 
@@ -33,8 +33,8 @@ class SensorAdapter(object):
         self._logger = logging.getLogger(LOG_ADSENSOR)
 
         for i in range(SensorAdapter.IO_NUMBER):
-            self._logger.debug("Channel ({:2}-{:2} on BCM{:0>2}) creating...".format(
-                i + 1, i % SensorAdapter.CHANNEL_COUNT + 1, SensorAdapter.SPI_CS[i // SensorAdapter.CHANNEL_COUNT]))
+            self._logger.debug("Channel (index:{:2} channel:{:2}<=CH{:0>2} on BCM{:0>2} ({})) creating...".format(
+                i, i % SensorAdapter.CHANNEL_COUNT, i + 1, SensorAdapter.SPI_CS[i // SensorAdapter.CHANNEL_COUNT], MCP3008.__name__))
             self._channels.append(
                 MCP3008(channel=i % SensorAdapter.CHANNEL_COUNT,
                         clock_pin=SPI_CLK,
@@ -45,9 +45,9 @@ class SensorAdapter(object):
 
     def get_value(self, channel):
         '''Get the value from one channel'''
-        if 0 < channel < 15:
-            # channel numbering correction board numbering CH1..CH15 => array 0..14
-            return self._channels[channel - 1].value
+        if 0 <= channel <= 14:
+            # !!! channel numbering correction board numbering CH1..CH15 => array 0..14
+            return self._channels[channel].value
         else:
             return 0
 

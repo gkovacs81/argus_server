@@ -161,7 +161,7 @@ class Notifier(Thread):
                 elif message['type'] == ALERT_STOPPED:
                     has_subscription = True
                     success |= self.notify_alert_stopped_email(message)
-        except KeyError:
+        except (KeyError, TypeError):
             self._logger.info("No subscription configured!")
             pass
 

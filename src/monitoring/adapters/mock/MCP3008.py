@@ -13,9 +13,11 @@ class TimeBasedMockMCP3008(object):
         self._channel = channel
         self._logger = logging.getLogger(LOG_ADSENSOR)
         self._starttime = None
+        self._logger.debug("Created mock MCP3008 %s", self.__class__)
 
     @property
     def value(self):
+        # working only on channel 0
         if self._channel == 0:
             if self._starttime and self._starttime + TimeBasedMockMCP3008.CHANGE_TIME > time():
                 return 1
@@ -38,15 +40,16 @@ class PatternBasedMockMCP3008(object):
         self._alert_source = []
         # clock
         self.i = 0
+        self._logger.debug("Created mock MCP3008 %s on channel: %s", self.__class__.__name__, self._channel)
 
     @property
     def value(self):
         try:
-            # print("Values: %s / %s" % (self._alert_source, self._channel))
+            # self._logger.debug("Values from %s (channel: %s): %s", self.__class__.__name__, self._channel, self._alert_source[self.i])
             value = self._alert_source[self.i][self._channel]
         except (KeyError, TypeError, IndexError):
             value = 0
-            self._logger.warn("No value for channel=%s on clock=%s in %s!", self._channel, self.i, self.__class__)
+            self._logger.warn("No value for channel=%s on clock=%s in %s!", self._channel, self.i, self.__class__.__name__)
 
         # step clock
         self.i += 1
@@ -96,7 +99,6 @@ class ShortAlertMCP3008(PatternBasedMockMCP3008):
     def __init__(self, *args, **kwargs):
         super(ShortAlertMCP3008, self).__init__(*args, **kwargs)
         self._alert_source = ShortAlertMCP3008.SHORT_ALERT
-
 
 class DoubleAlertMCP3008(PatternBasedMockMCP3008):
 

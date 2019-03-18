@@ -26,9 +26,10 @@ def env_prod():
     db.session.add(User(name="Administrator", role=ROLE_ADMIN, access_code="1234"))
     print(" - Created admin user")
     db.session.add_all([
-        SensorType(name='Motion sensor', description='Detect motion'),
-        SensorType(name='Break sensor', description='Detect glass break'),
-        SensorType(name='Tamper', description='Detect sabotage')
+        SensorType(name='Motion', description='Detect motion'),
+        SensorType(name='Tamper', description='Detect sabotage'),
+        SensorType(name='Open', description='Detect opening'),
+        SensorType(name='Break', description='Detect glass break')
     ])
     print(" - Created sensor types")
     db.session.commit()
@@ -38,9 +39,10 @@ def env_dev():
     db.session.add(User(name="Administrator", role=ROLE_ADMIN, access_code="1234"))
     print(" - Created admin user")
     db.session.add_all([
-        SensorType(name='Motion sensor', description='Detect motion'),
-        SensorType(name='Break sensor', description='Detect glass break'),
-        SensorType(name='Tamper', description='Detect sabotage')
+        SensorType(name='Motion', description='Detect motion'),
+        SensorType(name='Tamper', description='Detect sabotage'),
+        SensorType(name='Open', description='Detect opening'),
+        SensorType(name='Break', description='Detect glass break')
     ])
     print(" - Created sensor types")
     db.session.commit()
@@ -70,8 +72,8 @@ def env_test():
 
     st1 = SensorType('Motion', 'Motion sensor')
     st2 = SensorType('Tamper', 'Tamper sensor')
-    st3 = SensorType('Break', 'Break sensor')
-    st4 = SensorType('Open', 'Door open sensor')
+    st3 = SensorType('Open', 'Door open sensor')
+    st4 = SensorType('Break', 'Break sensor')
     db.session.add_all([st1, st2, st3, st4])
 
     s1 = Sensor(channel=0, zone=z2, sensor_type=st1, description="Garázs bejárati ajtó feletti mozgésérzékelő")

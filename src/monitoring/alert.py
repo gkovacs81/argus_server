@@ -122,7 +122,7 @@ class SyrenAlert(Thread):
         if not self.handle_sensors():
             db.session.commit()
 
-        send_alert_state(json.dumps(self._alert.serialize))
+        send_alert_state(self._alert.serialize)
         Notifier.notify_alert_started(self._alert.id, list(map(lambda alert_sensor: alert_sensor.sensor.description, self._alert.sensors)), start_time)
 
     def stop_alert(self):
@@ -133,7 +133,7 @@ class SyrenAlert(Thread):
             self._alert.end_time = datetime.datetime.now(pytz.timezone('CET'))
             db.session.commit()
 
-            send_alert_state(json.dumps(False))
+            send_alert_state(None)
             send_syren_state(None)
             Notifier.notify_alert_stopped(self._alert.id, self._alert.end_time)
 
@@ -151,7 +151,7 @@ class SyrenAlert(Thread):
                         already_added = True
 
                 if not already_added:
-                    alert_sensor = AlertSensor(channel=sensor.channel, description=sensor.description)
+                    alert_sensor = AlertSensor(channel=sensor.channel, type_id=sensor.type_id, description=sensor.description)
                     alert_sensor.sensor = sensor
                     self._alert.sensors.append(alert_sensor)
                     sensor_added = True
