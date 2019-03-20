@@ -57,7 +57,7 @@ class GSM(object):
                     self._logger.debug('GSM modem not ready. Retry...')
                     sleep(5)
                 else:
-                    self._logger.error('No answer from GSM module: %s', error)
+                    self._logger.error('No answer from GSM module: %s', str(error))
                     self._modem = None
                     return False
 
