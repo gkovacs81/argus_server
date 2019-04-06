@@ -61,11 +61,6 @@ def start():
     ipc_server = IPCServer(stop_event, broadcaster)
     ipc_server.start()
 
-    # start the socket IO server in he main thread
-    socketio_server = Thread(target=start_socketio,
-                             name=THREAD_SOCKETIO, daemon=True)
-    socketio_server.start()
-
     def stop_service():
         logger.info("Stopping service...")
         broadcaster.send_message(MONITOR_STOP)
@@ -86,25 +81,15 @@ def start():
 
     signal(SIGTERM, signal_term_handler)
 
-    '''
-    The main thread checks the health of the sub threads and crashes the application if any problem happens.
-    If the application stops the service running system has to restart it clearly.
+    # start the socket IO server in the main thread
+    try:
+        start_socketio()
+    except AssertionError:
+        pass
 
-    May be later threads can be implemented safe to avoid restarting the application.
-    '''
-    while True:
-        try:
-            for thread in (monitor, ipc_server, notifier, socketio_server):
-                if not thread.is_alive():
-                    logger.error("Thread crashed: %s", thread.name)
-                    stop_service()
-            sleep(1)
-        except KeyboardInterrupt:
-            logger.info("Keyboard interruption!!!")
-            break
+    logger.info("Stopping main...")
 
     stop_service()
-
 
 if __name__ == '__main__':
     start()

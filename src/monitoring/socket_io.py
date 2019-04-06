@@ -3,7 +3,9 @@ Created on 2017. szept. 23.
 
 @author: gkovacs
 '''
-
+import eventlet
+eventlet.monkey_patch()
+import eventlet.wsgi
 import logging
 import os
 import socketio
@@ -16,22 +18,21 @@ import jose.exceptions
 from monitoring.constants import LOG_SOCKETIO
 
 
-sio = socketio.Server(async_mode='threading')
+sio = socketio.Server(logger=True, async_mode='eventlet')
 logger = logging.getLogger(LOG_SOCKETIO)
 logging.getLogger('werkzeug').setLevel(logging.DEBUG)
 
 
 def start_socketio():
     app = Flask(__name__)
-    # wrap Flask application with socketio's middleware
-    app.wsgi_app = socketio.Middleware(sio, app.wsgi_app)
-    app.run(threaded=False, host=os.environ['MONITOR_HOST'], port=int(os.environ['MONITOR_PORT']))
+    app.wsgi_app = socketio.WSGIApp(sio, app.wsgi_app)
+    eventlet.wsgi.server(eventlet.listen(('', int(os.environ['MONITOR_PORT']))), app)
 
 
 @sio.on('connect')
 def connect(sid, environ):
-    logger.debug('Client: %s', sid)
-    #logger.debug('Client info "%s": %s', sid, environ)
+    #logger.debug('Client: %s', sid)
+    logger.debug('Client info "%s": %s', sid, environ)
     qs = parse_qs(environ['QUERY_STRING'])
     remote_address = environ['REMOTE_ADDR']
     try:
@@ -47,7 +48,7 @@ def connect(sid, environ):
 
 @sio.on('disconnect')
 def disconnect(sid):
-    logging.getLogger('SocketIO').info('Disconnected "%s"', sid)
+    logger.info('Disconnected %s', sid)
 
 def send_alert_state(arm_state):
     send_message('alert_state_change', arm_state)
@@ -65,6 +66,6 @@ def send_system_state_change(system_state):
     send_message('system_state_change', system_state)
 
 def send_message(message_type, message):
-    logging.getLogger('SocketIO').debug("Sending message: %s -> %s", message_type, message)
+    logger.debug("Sending message: %s -> %s", message_type, message)
     sio.emit(message_type, message)
 
