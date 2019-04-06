@@ -69,10 +69,6 @@ def start():
     ipc_server = IPCServer(stop_event, broadcaster)
     ipc_server.start()
 
-    # start the socket IO server in he main thread
-    socketio_server = Thread(target=start_socketio, name=THREAD_SOCKETIO, daemon=True)
-    socketio_server.start()
-
     def stop_service():
         logger.info("Stopping service...")
         broadcaster.send_message(MONITOR_STOP)
@@ -111,6 +107,14 @@ def start():
         except KeyboardInterrupt:
             logger.info("Keyboard interruption!!!")
             break
+
+    # start the socket IO server in the main thread
+    try:
+        start_socketio()
+    except AssertionError:
+        pass
+
+    logger.info("Stopping main...")
 
     stop_service()
 
