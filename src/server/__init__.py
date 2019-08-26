@@ -5,7 +5,7 @@ import re
 import socket
 
 from datetime import datetime as dt
-from flask import Flask, request, abort, jsonify
+from flask import Flask, request, abort, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from jose import jwt
 from os.path import isfile, join
@@ -23,8 +23,9 @@ from time import sleep
 
 argus_application_folder = os.path.join(os.getcwd(), os.environ.get('SERVER_STATIC_FOLDER', ''))
 
-app = Flask(__name__, static_folder=argus_application_folder, static_url_path='/')
-# app.logger.debug("App folder: %s", argus_application_folder)
+# app = Flask(__name__, static_folder=argus_application_folder, static_url_path='/')
+app = Flask(__name__)
+app.logger.debug("App folder: %s", argus_application_folder)
 
 POSTGRES = {
     'user': os.environ['DB_USER'],
@@ -45,8 +46,8 @@ from models import *
 
 @app.route('/')
 def root():
-    # app.logger.debug("ROOT")
-    return app.send_static_file('index.html')
+    app.logger.debug("ROOT: return index.html")
+    return send_from_directory(argus_application_folder, 'index.html')
 
 
 def authenticated(check_permissions=True):
@@ -322,7 +323,7 @@ def version():
 
 
 @app.route('/api/clock', methods=['GET'])
-#@authenticated()
+@authenticated()
 def get_clock():
     result = {
         'system': dt.now().isoformat(sep=' ')[:19],
@@ -336,9 +337,8 @@ def get_clock():
     else:
         result['network'] = None
 
-    
-
     return jsonify(result)
+
 
 @app.route('/api/clock', methods=['PUT'])
 def set_clock():
@@ -346,6 +346,7 @@ def set_clock():
     ipc_client.set_clock(request.json)
 
     return jsonify(True)
+
 
 @app.route('/api/clock/sync', methods=['PUT'])
 def sync_clock():
@@ -357,40 +358,44 @@ def sync_clock():
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def catch_all(path):
+    # app.logger.debug("Working in: %s", os.environ.get('SERVER_STATIC_FOLDER', ''))
     # app.logger.debug("FALLBACK for path: %s", path)
 
     # check compression
     compress = os.environ['COMPRESS'].lower() == 'true'
     if compress and (path.endswith(".js") or path.endswith(".css")):
+        # app.logger.debug("Use compression")
         path += ".gz"
     else:
         compress = False
 
     # detect language from url path (en|hu)
-    result = re.search('(' + '|'.join(os.environ['LANGUAGES'].split(' ')) + ')', path)
+    languages = os.environ['LANGUAGES'].split(' ')
+    result = re.search('(' + '|'.join(languages) + ')', path)
     language = result.group(0) if result else ''
 
-    # app.logger.debug("Language: %s / %s", language, os.environ['LANGUAGES'])
+    # app.logger.debug("Language: %s from %s", language if language else "No language in URL", languages)
     if language == 'en':
         path = path.replace('en/', '')
 
-    # app.logger.debug("FALLBACK for path: %s", path)
+    # app.logger.debug("FALLBACK for path processed: %s", path)
 
     # return with file if exists
-    # app.logger.error("Checking for %s or %s", join(argus_application_folder, path), join(argus_application_folder, language, 'index.html'))
+    # app.logger.debug("Checking for %s", path)
     if isfile(join(argus_application_folder, path)):
-        # app.logger.debug("Path exists! %s", path)
-        response = app.send_static_file(path)
+        # app.logger.debug("Path exists without language: %s", path)
+        response = send_from_directory(argus_application_folder, path)
         if compress:
             response.headers["Content-Encoding"] = "gzip"
         return response
     elif language and isfile(join(argus_application_folder, language, 'index.html')):
-        # app.logger.debug("Path exists! %s", join(language, 'index.html'))
-        return app.send_static_file(join(language, 'index.html'))
+        # app.logger.debug("Path exists with language: %s",join(language, 'index.html'))
+        return send_from_directory(join(argus_application_folder, language), 'index.html')
 
     # or return with the index file
-    # app.logger.debug("INDEX")
-    return app.send_static_file('index.html')
+    # app.logger.debug("INDEX without language: %s", join(language, 'index.html'))
+    return send_from_directory(argus_application_folder, 'index.html')
+
 
 if __name__ != '__main__':
     gunicorn_logger = logging.getLogger('gunicorn.error')

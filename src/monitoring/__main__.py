@@ -21,8 +21,7 @@ def initialize_logging():
         logger = logging.getLogger(module)
         logger.setLevel(logging.DEBUG)
         file_handler = logging.FileHandler('monitoring.log')
-        formatter = logging.Formatter(
-            '%(asctime)s-[%(threadName)10s|%(name)9s] %(levelname)5s: %(message)s')
+        formatter = logging.Formatter('%(asctime)s-[%(threadName)10s|%(name)9s] %(levelname)5s: %(message)s')
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
 
