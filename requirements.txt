@@ -12,7 +12,6 @@ jinja2
 itsdangerous
 click
 Crypto
-pycrypto
 ecdsa
 python-crontab
 
