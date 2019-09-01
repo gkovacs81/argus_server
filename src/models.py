@@ -12,11 +12,11 @@ from server import db
 
 
 def hash_access_code(access_code):
-    return hashlib.sha256((access_code + ':' + os.environ.get("SALT")).encode('utf-8')).hexdigest()
+    return hashlib.sha256((access_code + ":" + os.environ.get("SALT")).encode("utf-8")).hexdigest()
 
 
 def update_record(record, attributes, data):
-    '''Update the given attributes of a record (dict) based on a dictionary'''
+    """Update the given attributes of a record (dict) based on a dictionary"""
     record_changed = False
     for key, value in data.items():
         if key in attributes:
@@ -35,17 +35,17 @@ def merge_dicts(target, source):
 
     for k, v in source.items():
         if type(v) == list:
-            if not k in target:
+            if k not in target:
                 target[k] = copy.deepcopy(v)
             else:
                 target[k].extend(v)
         elif type(v) == dict:
-            if not k in target:
+            if k not in target:
                 target[k] = copy.deepcopy(v)
             else:
                 merge_dicts(target[k], v)
         elif type(v) == set:
-            if not k in target:
+            if k not in target:
                 target[k] = v.copy()
             else:
                 target[k].update(v.copy())
@@ -67,6 +67,7 @@ def filter_keys(data, keys):
 
 class BaseModel(db.Model):
     """Base data model for all objects"""
+
     __abstract__ = True
 
     def __init__(self, *args):
@@ -74,24 +75,19 @@ class BaseModel(db.Model):
 
     def __repr__(self):
         """Define a base way to print models"""
-        return '%s(%s)' % (self.__class__.__name__, {
-            column: value
-            for column, value in self.__dict__.items()
-        })
+        return "%s(%s)" % (self.__class__.__name__, {column: value for column, value in self.__dict__.items()})
 
     def json(self):
         """
         Define a base way to jsonify models, dealing with datetime objects
         """
-        return {
-            column: value if not isinstance(value, datetime.date) else value.strftime('%Y-%m-%d')
-            for column, value in self.__dict__.items()
-        }
+        return {column: value if not isinstance(value, datetime.date) else value.strftime("%Y-%m-%d") for column, value in self.__dict__.items()}
 
 
 class SensorType(BaseModel):
     """Model for sensor type table"""
-    __tablename__ = 'sensor_type'
+
+    __tablename__ = "sensor_type"
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(16))
@@ -103,16 +99,13 @@ class SensorType(BaseModel):
 
     @property
     def serialize(self):
-        return {
-            'id' : self.id,
-            'name' : self.name,
-            'description' : self.description
-        }
+        return {"id": self.id, "name": self.name, "description": self.description}
 
 
 class Sensor(BaseModel):
     """Model for the sensor table"""
-    __tablename__ = 'sensor'
+
+    __tablename__ = "sensor"
 
     id = db.Column(db.Integer, primary_key=True)
     channel = db.Column(db.Integer, nullable=False)
@@ -122,12 +115,12 @@ class Sensor(BaseModel):
     deleted = db.Column(db.Boolean, default=False)
     description = db.Column(db.String, nullable=False)
 
-    zone_id = db.Column(db.Integer, db.ForeignKey('zone.id'), nullable=False)
-    zone = db.relationship('Zone', backref=db.backref('zone', lazy='dynamic'))
+    zone_id = db.Column(db.Integer, db.ForeignKey("zone.id"), nullable=False)
+    zone = db.relationship("Zone", backref=db.backref("zone", lazy="dynamic"))
 
-    type_id = db.Column(db.Integer, db.ForeignKey('sensor_type.id'), nullable=False)
-    type = db.relationship('SensorType', backref=db.backref('sensor_type', lazy='dynamic'))
-    alerts = db.relationship('AlertSensor', back_populates='sensor')
+    type_id = db.Column(db.Integer, db.ForeignKey("sensor_type.id"), nullable=False)
+    type = db.relationship("SensorType", backref=db.backref("sensor_type", lazy="dynamic"))
+    alerts = db.relationship("AlertSensor", back_populates="sensor")
 
     def __init__(self, channel=0, zone=None, sensor_type=0, description=None):
         self.channel = channel
@@ -138,30 +131,31 @@ class Sensor(BaseModel):
         self.deleted = False
 
     def update(self, data):
-        return update_record(self, ('channel', 'enabled', 'description', 'zone_id', 'type_id'), data)
+        return update_record(self, ("channel", "enabled", "description", "zone_id", "type_id"), data)
 
     @property
     def serialize(self):
         return {
-            'id' : self.id,
-            'channel' : self.channel,
-            'alert': self.alert,
-            'description' : self.description,
-            'zone_id' : self.zone_id,
-            'type_id' : self.type_id,
-            'enabled' : self.enabled,
+            "id": self.id,
+            "channel": self.channel,
+            "alert": self.alert,
+            "description": self.description,
+            "zone_id": self.zone_id,
+            "type_id": self.type_id,
+            "enabled": self.enabled,
         }
 
 
 class Alert(BaseModel):
     """Model for alert table"""
-    __tablename__ = 'alert'
+
+    __tablename__ = "alert"
 
     id = db.Column(db.Integer, primary_key=True)
     arm_type = db.Column(db.String)
     start_time = db.Column(db.DateTime(timezone=True))
     end_time = db.Column(db.DateTime(timezone=True))
-    sensors = db.relationship('AlertSensor', back_populates='alert')
+    sensors = db.relationship("AlertSensor", back_populates="alert")
 
     def __init__(self, arm_type, start_time, sensors, end_time=None):
         self.arm_type = arm_type
@@ -171,31 +165,28 @@ class Alert(BaseModel):
 
     @property
     def serialize(self):
-        locale.setlocale(locale.LC_ALL, '')
+        locale.setlocale(locale.LC_ALL, "")
         return {
-            'id' : self.id,
-            'arm_type': self.arm_type,
-            'start_time' : self.start_time.replace(microsecond=0, tzinfo=None).isoformat(sep=' '),
-            'end_time': self.end_time.replace(microsecond=0, tzinfo=None).isoformat(sep=' ') if self.end_time else '',
-            'sensors' : [
-                {
-                    'id': alert_sensor.sensor_id,
-                    'channel': alert_sensor.channel,
-                    'type_id': alert_sensor.type_id,
-                    'description':alert_sensor.description
-                }
-                for alert_sensor in self.sensors]
+            "id": self.id,
+            "arm_type": self.arm_type,
+            "start_time": self.start_time.replace(microsecond=0, tzinfo=None).isoformat(sep=" "),
+            "end_time": self.end_time.replace(microsecond=0, tzinfo=None).isoformat(sep=" ") if self.end_time else "",
+            "sensors": [
+                {"id": alert_sensor.sensor_id, "channel": alert_sensor.channel, "type_id": alert_sensor.type_id, "description": alert_sensor.description}
+                for alert_sensor in self.sensors
+            ],
         }
 
+
 class AlertSensor(BaseModel):
-    __tablename__ = 'alert_sensor'
-    alert_id = db.Column(db.Integer, db.ForeignKey('alert.id'), primary_key=True)
-    sensor_id = db.Column(db.Integer, db.ForeignKey('sensor.id'), primary_key=True)
+    __tablename__ = "alert_sensor"
+    alert_id = db.Column(db.Integer, db.ForeignKey("alert.id"), primary_key=True)
+    sensor_id = db.Column(db.Integer, db.ForeignKey("sensor.id"), primary_key=True)
     channel = db.Column(db.Integer)
-    type_id = db.Column(db.Integer, db.ForeignKey('sensor_type.id'), nullable=False)
+    type_id = db.Column(db.Integer, db.ForeignKey("sensor_type.id"), nullable=False)
     description = db.Column(db.String)
-    sensor = db.relationship('Sensor', back_populates='alerts')
-    alert = db.relationship('Alert', back_populates='sensors')
+    sensor = db.relationship("Sensor", back_populates="alerts")
+    alert = db.relationship("Alert", back_populates="sensors")
 
     def __init__(self, channel, type_id, description):
         self.channel = channel
@@ -205,7 +196,8 @@ class AlertSensor(BaseModel):
 
 class Zone(BaseModel):
     """Model for zone table"""
-    __tablename__ = 'zone'
+
+    __tablename__ = "zone"
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(32), nullable=False)
@@ -215,7 +207,7 @@ class Zone(BaseModel):
     stay_delay = db.Column(db.Integer, default=None, nullable=True)
     deleted = db.Column(db.Boolean, default=False)
 
-    def __init__(self, name='zone', disarmed_delay=0, away_delay=0, stay_delay=0, description='Default zone'):
+    def __init__(self, name="zone", disarmed_delay=0, away_delay=0, stay_delay=0, description="Default zone"):
         self.name = name
         self.description = description
         self.disarmed_delay = disarmed_delay
@@ -223,20 +215,20 @@ class Zone(BaseModel):
         self.stay_delay = stay_delay
 
     def update(self, data):
-        return update_record(self, ('name', 'description', 'disarmed_delay', 'away_delay', 'stay_delay'), data)
+        return update_record(self, ("name", "description", "disarmed_delay", "away_delay", "stay_delay"), data)
 
     @property
     def serialize(self):
         return {
-            'id' : self.id,
-            'name' : self.name,
-            'description' : self.description,
-            'disarmed_delay' : self.disarmed_delay,
-            'away_delay' : self.away_delay,
-            'stay_delay' : self.stay_delay
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "disarmed_delay": self.disarmed_delay,
+            "away_delay": self.away_delay,
+            "stay_delay": self.stay_delay,
         }
 
-    @validates('disarmed_delay', 'away_delay', 'stay_delay')
+    @validates("disarmed_delay", "away_delay", "stay_delay")
     def validates_away_delay(self, key, delay):
         assert delay and delay >= 0 or not delay
         return delay
@@ -244,7 +236,8 @@ class Zone(BaseModel):
 
 class User(BaseModel):
     """Model for role table"""
-    __tablename__ = 'user'
+
+    __tablename__ = "user"
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(32), nullable=False)
@@ -257,24 +250,21 @@ class User(BaseModel):
         self.access_code = hash_access_code(access_code)
 
     def update(self, data):
-        if 'access_code' in data and data['access_code']:
-            data['access_code'] = hash_access_code(data['access_code'])
-            return update_record(self, ('name', 'role', 'access_code'), data)
+        if "access_code" in data and data["access_code"]:
+            data["access_code"] = hash_access_code(data["access_code"])
+            return update_record(self, ("name", "role", "access_code"), data)
         else:
-            return update_record(self, ('name', 'role'), data)
+            return update_record(self, ("name", "role"), data)
 
     @property
     def serialize(self):
-        return {
-            'id': self.id,
-            'name': self.name,
-            'role': self.role,
-        }
+        return {"id": self.id, "name": self.name, "role": self.role}
 
 
 class Option(BaseModel):
     """Model for option table"""
-    __tablename__ = 'option'
+
+    __tablename__ = "option"
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(32), nullable=False)
@@ -287,7 +277,7 @@ class Option(BaseModel):
         self.value = value
 
     def update_value(self, value):
-        '''Update the value field (merging dictionaries). Return true if value changed'''
+        """Update the value field (merging dictionaries). Return true if value changed"""
         if not self.value:
             self.value = json.dumps(value)
             return True
@@ -302,10 +292,6 @@ class Option(BaseModel):
     @property
     def serialize(self):
         filtered_value = deepcopy(json.loads(self.value))
-        filter_keys(filtered_value, ['smtp_password'])
-        filter_keys(filtered_value, ['password'])
-        return {
-            'name': self.name,
-            'section': self.section,
-            'value': json.dumps(filtered_value)
-        }
+        filter_keys(filtered_value, ["smtp_password"])
+        filter_keys(filtered_value, ["password"])
+        return {"name": self.name, "section": self.section, "value": json.dumps(filtered_value)}

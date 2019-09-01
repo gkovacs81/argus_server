@@ -28,6 +28,9 @@ pydbus = "*"
 gobject = "*"
 
 [dev-packages]
+flake8 = "*"
+autopep8 = "*"
+black = "*"
 
 [requires]
 python_version = "3.7"
