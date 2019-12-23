@@ -4,6 +4,7 @@ Created on 2017. aug. 28.
 @author: gkovacs
 '''
 
+from datetime import datetime
 import logging
 
 from os import environ
@@ -11,7 +12,7 @@ from threading import Thread, Event
 from time import sleep
 from eventlet.queue import Empty
 
-from models import *
+from models import db, Alert, Sensor
 import monitoring.alert
 
 from monitoring.adapters.power import PowerAdapter
@@ -81,6 +82,7 @@ class Monitor(Thread):
         while True:
             try:
                 action = self._actions.get(True, 1 / int(environ['SAMPLE_RATE']))
+                self._logger.debug("Action: %s" % action)
                 if action == MONITOR_STOP:
                     break
                 elif action == MONITOR_ARM_AWAY:
@@ -117,7 +119,6 @@ class Monitor(Thread):
         self._stop_alert.set()
         self._logger.info("Monitoring stopped")
 
-
     def check_power(self):
         # load the value once fron the adapter
         new_power_source = self._powerAdapter.source_type
@@ -126,13 +127,13 @@ class Monitor(Thread):
         elif new_power_source == PowerAdapter.SOURCE_NETWORK and self._power_source is None:
             self._logger.info("System works from network")
         elif new_power_source == PowerAdapter.SOURCE_BATTERY and \
-            self._power_source == PowerAdapter.SOURCE_NETWORK:
+                self._power_source == PowerAdapter.SOURCE_NETWORK:
+
             self._logger.info("Power outage started!")
         elif new_power_source == PowerAdapter.SOURCE_NETWORK and \
-            self._power_source == PowerAdapter.SOURCE_BATTERY:
+                self._power_source == PowerAdapter.SOURCE_BATTERY:
             self._logger.info("Power outage ended!")
-        self._power_source = new_power_source 
-
+        self._power_source = new_power_source
 
     def validate_sensor_config(self):
         self._logger.debug("Validating config...")
@@ -146,7 +147,6 @@ class Monitor(Thread):
 
         self._logger.debug("Channels: %s", channels)
         return True
-
 
     def load_sensors(self):
         '''Load the sensors from the db in the thread to avoid session problems'''
@@ -184,7 +184,6 @@ class Monitor(Thread):
 
         send_sensors_state(False)
 
-
     def calibrate_sensors(self):
         self._logger.info("Initialize sensor references...")
         new_references = self.measure_sensor_references()
@@ -194,14 +193,12 @@ class Monitor(Thread):
         else:
             self._logger.error("Error measure values! %s", self._references)
 
-
     def has_uninitialized_sensor(self):
         for sensor in self._sensors:
             if sensor.reference_value is None:
                 return True
 
         return False
-
 
     def cleanup_database(self):
         changed = False
@@ -212,7 +209,7 @@ class Monitor(Thread):
                 self._logger.debug('Cleared sensor')
 
         for alert in Alert.query.filter_by(end_time=None).all():
-            alert.end_time = datetime.datetime.fromtimestamp(DEFAULT_DATETIME)
+            alert.end_time = datetime.fromtimestamp(DEFAULT_DATETIME)
             self._logger.debug('Cleared alert')
             changed = True
 
@@ -222,12 +219,10 @@ class Monitor(Thread):
         else:
             self._logger.debug('Cleared nothing')
 
-
     def save_sensor_references(self, references):
         for sensor in self._sensors:
             sensor.reference_value = references[sensor.channel]
             db.session.commit()
-
 
     def measure_sensor_references(self):
         measurements = []
@@ -245,7 +240,6 @@ class Monitor(Thread):
             references[channel] = value_sum / MEASUREMENT_CYCLES
 
         return list(references.values())
-
 
     def scan_sensors(self):
         changes = False
@@ -272,7 +266,6 @@ class Monitor(Thread):
             db.session.commit()
             send_sensors_state(found_alert)
 
-
     def handle_alerts(self):
         # check for alerting sensors if armed
 
@@ -283,10 +276,10 @@ class Monitor(Thread):
         changes = False
         for sensor in self._sensors:
             if sensor.alert and sensor.id not in self._alerts and sensor.enabled:
-                if not sensor.zone.disarmed_delay is None and current_state == MONITORING_READY or \
-                    not sensor.zone.disarmed_delay is None and current_state == MONITORING_SABOTAGE or \
-                    not sensor.zone.away_delay is None and current_arm == ARM_AWAY or \
-                    not sensor.zone.stay_delay is None and current_arm == ARM_STAY:
+                if sensor.zone.disarmed_delay is not None and current_state == MONITORING_READY or \
+                   sensor.zone.disarmed_delay is not None and current_state == MONITORING_SABOTAGE or \
+                   sensor.zone.away_delay is not None and current_arm == ARM_AWAY or \
+                   sensor.zone.stay_delay is not None and current_arm == ARM_STAY:
                     self._alerts[sensor.id] = {'alert': monitoring.alert.SensorAlert(sensor.id, current_arm, self._stop_alert)}
                     self._alerts[sensor.id]['alert'].start()
                     changes = True

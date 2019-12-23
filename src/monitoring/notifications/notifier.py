@@ -7,11 +7,12 @@ from queue import Empty
 from smtplib import SMTPException
 from threading import Thread
 
-from monitoring.notifications.templates import *
+from monitoring.notifications.templates import ALERT_STARTED_EMAIL, ALERT_STOPPED_EMAIL, ALERT_STARTED_SMS, ALERT_STOPPED_SMS
 from monitoring.constants import LOG_NOTIFIER, THREAD_NOTIFIER
 from models import Option
 from monitoring.constants import MONITOR_STOP, MONITOR_UPDATE_CONFIG
 
+# check if running on Raspberry
 if os.uname()[4][:3] == 'arm':
     from monitoring.adapters.gsm import GSM
 else:
@@ -23,7 +24,7 @@ Messages
 
 {
     "type": "alert_started" / "alert_stopped",
-    "id": "alert id", 
+    "id": "alert id",
     "source": "address",
     "sensors": ["Sensor name"],
     "time": "start time",
@@ -102,7 +103,7 @@ class Notifier(Thread):
             try:
                 message = Notifier._actions.get(timeout=Notifier.RETRY_WAIT)
             except Empty:
-                #self._logger.debug("No message found")
+                # self._logger.debug("No message found")
                 pass
 
             # handle actions or messages
@@ -114,7 +115,7 @@ class Notifier(Thread):
                     self._gsm.destroy()
                     self._gsm = GSM()
                     self._gsm.setup()
-            elif not message is None:
+            elif message is not None:
                 message['retry'] = 0
                 self._messages.append(message)
 

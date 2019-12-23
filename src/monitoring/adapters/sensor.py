@@ -10,12 +10,12 @@ import logging
 from monitoring.adapters import SPI_CLK, SPI_MISO, SPI_MOSI
 from monitoring.constants import LOG_ADSENSOR
 
+# check if running on Raspberry
 if os.uname()[4][:3] == 'arm':
     from gpiozero import MCP3008
 else:
-    #from monitoring.adapters.mock import TimeBasedMockMCP3008 as MCP3008
+    # from monitoring.adapters.mock import TimeBasedMockMCP3008 as MCP3008
     from monitoring.adapters.mock.MCP3008 import DoubleAlertMCP3008 as MCP3008
-
 
 
 class SensorAdapter(object):
@@ -36,12 +36,14 @@ class SensorAdapter(object):
             self._logger.debug("Channel (index:{:2} channel:{:2}<=CH{:0>2} on BCM{:0>2} ({})) creating...".format(
                 i, i % SensorAdapter.CHANNEL_COUNT, i + 1, SensorAdapter.SPI_CS[i // SensorAdapter.CHANNEL_COUNT], MCP3008.__name__))
             self._channels.append(
-                MCP3008(channel=i % SensorAdapter.CHANNEL_COUNT,
-                        clock_pin=SPI_CLK,
-                        mosi_pin=SPI_MOSI,
-                        miso_pin=SPI_MISO,
-                        select_pin=SensorAdapter.SPI_CS[i // SensorAdapter.CHANNEL_COUNT]
-            ))
+                MCP3008(
+                    channel=i % SensorAdapter.CHANNEL_COUNT,
+                    clock_pin=SPI_CLK,
+                    mosi_pin=SPI_MOSI,
+                    miso_pin=SPI_MISO,
+                    select_pin=SensorAdapter.SPI_CS[i // SensorAdapter.CHANNEL_COUNT]
+                )
+            )
 
     def get_value(self, channel):
         '''Get the value from one channel'''
