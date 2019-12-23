@@ -3,6 +3,7 @@ Created on 2017. dec. 3.
 
 @author: gkovacs
 '''
+from logging import DEBUG, INFO
 
 # INTERNAL COMMANDS
 # monitoring system commands
@@ -10,6 +11,7 @@ MONITOR_ARM_AWAY = 'monitor_arm_away'
 MONITOR_ARM_STAY = 'monitor_arm_stay'
 MONITOR_DISARM = 'monitor_disarm'
 MONITOR_UPDATE_CONFIG = 'monitor_update_config'
+MONITOR_UPDATE_KEYPAD = 'monitor_update_keypad'
 MONITOR_UPDATE_DYNDNS = 'monitor_update_dyndns'
 MONITOR_STOP = 'monitor_stop'
 MONITOR_SYNC_CLOCK = 'monitor_sync_clock'
@@ -27,7 +29,8 @@ THREAD_IPC      = 'IPC'
 THREAD_NOTIFIER = 'Notifier'
 THREAD_SOCKETIO = 'SocketIO'
 THREAD_ALERT    = 'Alert'
- 
+THREAD_KEYPAD   = 'Keypad'
+
 LOG_SERVICE   = THREAD_SERVICE
 LOG_MONITOR   = THREAD_MONITOR
 LOG_IPC       = THREAD_IPC
@@ -38,17 +41,19 @@ LOG_ADSENSOR  = 'AD.Sensor'
 LOG_ADPOWER   = 'AD.Power'
 LOG_ADSYREN   = 'AD.Syren'
 LOG_ADGSM     = 'AD.GSM'
+LOG_ADKEYPAD  = 'AD.Keypad'
 
 LOGGING_MODULES = [
-    LOG_SERVICE,
-    LOG_MONITOR,
-    LOG_IPC,
-    LOG_ALERT,
-    LOG_SOCKETIO,
-    LOG_NOTIFIER,
-    LOG_ADSENSOR,
-    LOG_ADSYREN,
-    LOG_ADGSM
+    (LOG_SERVICE, INFO),
+    (LOG_MONITOR, DEBUG),
+    (LOG_IPC, INFO),
+    (LOG_ALERT, INFO),
+    (LOG_SOCKETIO, INFO),
+    (LOG_NOTIFIER, INFO),
+    (LOG_ADSENSOR, INFO),
+    (LOG_ADSYREN, INFO),
+    (LOG_ADGSM, INFO),
+    (LOG_ADKEYPAD, DEBUG)
 ]
 
 

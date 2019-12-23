@@ -1,25 +1,25 @@
 import logging
 import os
 import sys
-
 from queue import Queue
 from signal import SIGTERM, signal
+from threading import Event, Thread
 from time import sleep
-from threading import Thread, Event
 
-from server.broadcast import Broadcaster
-from monitoring.constants import MONITOR_STOP, LOGGING_MODULES, THREAD_SOCKETIO,\
-    LOG_SERVICE
+from monitoring.adapters.keypad import Keypad
+from monitoring.constants import (LOG_SERVICE, LOGGING_MODULES, MONITOR_STOP,
+                                  THREAD_SOCKETIO)
 from monitoring.ipc import IPCServer
 from monitoring.monitor import Monitor
 from monitoring.notifications.notifier import Notifier
 from monitoring.socket_io import start_socketio
+from server.broadcast import Broadcaster
 
 
 def initialize_logging():
     for module in LOGGING_MODULES:
-        logger = logging.getLogger(module)
-        logger.setLevel(logging.DEBUG)
+        logger = logging.getLogger(module[0])
+        logger.setLevel(module[1])
         file_handler = logging.FileHandler('monitoring.log')
         formatter = logging.Formatter('%(asctime)s-[%(threadName)10s|%(name)9s] %(levelname)5s: %(message)s')
         file_handler.setFormatter(formatter)
@@ -54,15 +54,18 @@ def start():
     notifier = Notifier()
     notifier.start()
 
-    broadcaster = Broadcaster([monitor_actions, notifier_actions])
+    keypad_actions = Queue()
+    keypad = Keypad(keypad_actions, monitor_actions)
+    keypad.start()
+
+    broadcaster = Broadcaster([monitor_actions, notifier_actions, keypad_actions])
 
     stop_event = Event()
     ipc_server = IPCServer(stop_event, broadcaster)
     ipc_server.start()
 
     # start the socket IO server in he main thread
-    socketio_server = Thread(target=start_socketio,
-                             name=THREAD_SOCKETIO, daemon=True)
+    socketio_server = Thread(target=start_socketio, name=THREAD_SOCKETIO, daemon=True)
     socketio_server.start()
 
     def stop_service():
@@ -70,6 +73,8 @@ def start():
         broadcaster.send_message(MONITOR_STOP)
         stop_event.set()
 
+        keypad.join()
+        logger.debug("Keypad process stopped")
         notifier.join()
         logger.debug("Notifier thread stopped")
         monitor.join()
