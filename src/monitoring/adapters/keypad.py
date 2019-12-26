@@ -60,9 +60,9 @@ class Keypad(Thread):
             self._logger.error("Keyboard interrupt")
             pass
         except Exception:
-            self._logger.exception("Communication failed!")
+            self._logger.exception("Keypad communication failed!")
 
-        self._logger.info("Communication ended")
+        self._logger.info("Keypad manager stopped")
 
     def communicate(self):
         self._keypad.initialise()

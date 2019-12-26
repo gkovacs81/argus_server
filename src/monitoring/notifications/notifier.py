@@ -130,7 +130,7 @@ class Notifier(Thread):
                         self._logger.debug("Deleted message after max retry (%s): %s",
                                            Notifier.MAX_RETRY, self._messages.pop(0))
 
-        self._logger.info("Notifier stopped...")
+        self._logger.info("Notifier stopped")
 
     def get_options(self):
         options = {}

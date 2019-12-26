@@ -17,19 +17,23 @@ from server.broadcast import Broadcaster
 
 
 def initialize_logging():
-    for module in LOGGING_MODULES:
-        logger = logging.getLogger(module[0])
-        logger.setLevel(module[1])
-        file_handler = logging.FileHandler('monitoring.log')
-        formatter = logging.Formatter('%(asctime)s-[%(threadName)10s|%(name)9s] %(levelname)5s: %(message)s')
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
+    formatter = logging.Formatter('%(asctime)s-[%(threadName)10s|%(name)9s] %(levelname)5s: %(message)s')
 
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(formatter)
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+
+    file_handler = logging.FileHandler('monitoring.log')
+    file_handler.setFormatter(formatter)
+
+    for name, level in LOGGING_MODULES:
+        logger = logging.getLogger(name)
+        logger.setLevel(level)
+        logger.addHandler(file_handler)
         logger.addHandler(console_handler)
 
     logging.getLogger('SocketIOServer').setLevel(logging.INFO)
+    logging.getLogger('gsmmodem.modem.GsmModem').setLevel(logging.ERROR)
+    logging.getLogger('gsmmodem.serial_comms.SerialComms').setLevel(logging.ERROR)
 
 
 def createPidFile():
@@ -74,7 +78,7 @@ def start():
         stop_event.set()
 
         keypad.join()
-        logger.debug("Keypad process stopped")
+        logger.debug("Keypad thread stopped")
         notifier.join()
         logger.debug("Notifier thread stopped")
         monitor.join()
@@ -98,7 +102,7 @@ def start():
     '''
     while True:
         try:
-            for thread in (monitor, ipc_server, notifier, socketio_server):
+            for thread in (monitor, ipc_server, notifier, keypad, socketio_server):
                 if not thread.is_alive():
                     logger.error("Thread crashed: %s", thread.name)
                     stop_service()
