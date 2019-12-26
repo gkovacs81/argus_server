@@ -37,13 +37,13 @@ class MockKeypad(KeypadBase):
         self.send_command(self.send_beep, 2)
 
     def communicate(self):
-        # self._logger.debug("Start communication...")
+        self._logger.debug("Start communication MOCK...")
 
         if time() - self._start > 10 and self._index is None:
             self._index = 0
 
         if self._index is not None:
-            self.keypresses.append(self.CODES[self._index])
+            self.pressed = self.CODES[self._index]
             self._index += 1
 
         if self._index == len(self.CODES):

@@ -4,7 +4,7 @@ class KeypadBase:
     def __init__(self, clock_pin, data_pin):
         self._clock = clock_pin
         self._data = data_pin
-        self.keypresses = []
+        self.pressed = None
 
     def initialise(self):
         pass

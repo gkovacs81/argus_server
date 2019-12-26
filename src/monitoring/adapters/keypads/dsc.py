@@ -5,7 +5,7 @@ from time import sleep, time
 
 import RPi.GPIO as GPIO
 
-from base import KeypadBase
+from monitoring.adapters.keypads.base import KeypadBase
 from monitoring.constants import LOG_ADKEYPAD
 
 # Magic numbers
@@ -87,7 +87,7 @@ class Buttons:
 
 
 class Line:
-    BYTE_GAP = 0.001
+    BYTE_GAP = 0  # 0.001
 
     def __init__(self, clock, data):
         self._clock = clock
@@ -148,11 +148,10 @@ class DSCKeypad(KeypadBase):
     BEEP = 0x64
 
     def __init__(self, clock_pin, data_pin):
-        super(DSCKeypad, self).__init__()
+        super(DSCKeypad, self).__init__(clock_pin, data_pin)
         self._logger = logging.getLogger(LOG_ADKEYPAD)
         self._lights = Lights()
         self._line = Line(clock=clock_pin, data=data_pin)
-        self.keypresses = []
 
     def initialise(self):
         # initialize connection
@@ -175,7 +174,7 @@ class DSCKeypad(KeypadBase):
         self.send_command(self.send_beep, 2)
 
     def communicate(self):
-        self._logger.info("Start communication...")
+        self._logger.debug("Start communication DSC...")
         self.send_command(self.send_partition_status)
 
         if time() % 240 == 0:
@@ -196,9 +195,7 @@ class DSCKeypad(KeypadBase):
             pass
 
         if self._line.conversation[2]["received"] != VOID:
-            message = f"{Buttons.get_button(self._line.conversation[2]['received'])}"
-            self._logger.debug("Message: %s", message)
-            self.keypresses.put(message)
+            self.pressed = f"{Buttons.get_button(self._line.conversation[2]['received'])}"
         self.print_communication()
 
         if do_keybus_query:
@@ -206,7 +203,7 @@ class DSCKeypad(KeypadBase):
             self.print_communication()
 
     def send_beep(self, count):
-        self._logger.info("BEEP 0x%0X" % self.BEEP)
+        self._logger.debug("BEEP 0x%0X x %s", self.BEEP, count)
 
         param = 0x04
         if count == 2:
@@ -293,8 +290,8 @@ class DSCKeypad(KeypadBase):
                 sent += " {0:08b}".format(message["sent"])
                 received += " {0:08b}".format(message["received"])
 
-        self._logger.debug("Sent:     {}".format(sent))
-        self._logger.debug("Received: {}".format(received))
+        # self._logger.debug("Sent:     {}".format(sent))
+        # self._logger.debug("Received: {}".format(received))
         try:
             if self._line.conversation[4]["received"] == 0xFE:
                 self._logger.warning("!!! Unknown command !!!")
