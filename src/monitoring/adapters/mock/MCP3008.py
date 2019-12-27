@@ -49,7 +49,7 @@ class PatternBasedMockMCP3008(object):
             value = self._alert_source[self.i][self._channel]
         except (KeyError, TypeError, IndexError):
             value = 0
-            self._logger.warn("No value for channel=%s on clock=%s in %s!", self._channel, self.i, self.__class__.__name__)
+            self._logger.debug("No value for channel=%s on clock=%s in %s!", self._channel, self.i, self.__class__.__name__)
 
         # step clock
         self.i += 1

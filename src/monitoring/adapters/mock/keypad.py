@@ -7,7 +7,7 @@ from monitoring.constants import LOG_ADKEYPAD
 
 class MockKeypad(KeypadBase):
 
-    CODES = "1234    1111      9876"
+    CODES = "1234    1111      9876   65        "
 
     def __init__(self, clock_pin, data_pin):
         super(MockKeypad, self).__init__(clock_pin, data_pin)

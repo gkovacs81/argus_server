@@ -105,7 +105,8 @@ class Keypad(Thread):
                 except IndexError:
                     pass
 
-            self._logger.debug("Presses: %s", presses)
+            if presses:
+                self._logger.debug("Presses: %s", presses)
             self._keypad.pressed = None
 
             if hash_access_code(presses) in self._codes:
