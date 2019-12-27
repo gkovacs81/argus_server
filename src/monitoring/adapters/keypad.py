@@ -4,6 +4,7 @@ from queue import Empty
 from threading import Thread
 from time import time
 
+from models import User, hash_access_code
 from monitoring.adapters.keypads.base import KeypadBase
 from monitoring.adapters.mock.keypad import MockKeypad
 from monitoring.constants import (LOG_ADKEYPAD, MONITOR_ARM_AWAY,
@@ -47,8 +48,9 @@ class Keypad(Thread):
 
     def run(self):
         # load from db
+        users = User.query.all()
+        self._codes = [user.fourkey_code for user in users]
         self.set_type("dsc")
-        self._codes = ["1234", "1111"]
 
         try:
             self.communicate()
@@ -106,7 +108,7 @@ class Keypad(Thread):
             self._logger.debug("Presses: %s", presses)
             self._keypad.pressed = None
 
-            if presses in self._codes:
+            if hash_access_code(presses) in self._codes:
                 self._logger.debug("Code: %s", presses)
                 self._responses.put(MONITOR_DISARM)
                 self._keypad.set_armed(False)

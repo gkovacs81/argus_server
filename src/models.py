@@ -4,9 +4,9 @@ import hashlib
 import json
 import locale
 import os
+from copy import deepcopy
 
 from sqlalchemy.orm.mapper import validates
-from copy import deepcopy
 
 from server import db
 
@@ -93,7 +93,8 @@ class SensorType(BaseModel):
     name = db.Column(db.String(16))
     description = db.Column(db.String)
 
-    def __init__(self, name, description):
+    def __init__(self, id, name, description):
+        self.id = id
         self.name = name
         self.description = description
 
@@ -207,7 +208,7 @@ class Zone(BaseModel):
     stay_delay = db.Column(db.Integer, default=None, nullable=True)
     deleted = db.Column(db.Boolean, default=False)
 
-    def __init__(self, name="zone", disarmed_delay=0, away_delay=0, stay_delay=0, description="Default zone"):
+    def __init__(self, name="zone", disarmed_delay=None, away_delay=0, stay_delay=0, description="Default zone"):
         self.name = name
         self.description = description
         self.disarmed_delay = disarmed_delay
@@ -241,24 +242,33 @@ class User(BaseModel):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(32), nullable=False)
+    email = db.Column(db.String(255), nullable=True)
     role = db.Column(db.String(12), nullable=False)
     access_code = db.Column(db.String, nullable=False)
+    fourkey_code = db.Column(db.String, nullable=False)
+    comment = db.Column(db.String(256), nullable=True)
 
-    def __init__(self, name, role, access_code):
+    def __init__(self, name, role, access_code, fourkey_code=None):
         self.name = name
+        self.email = ""
         self.role = role
         self.access_code = hash_access_code(access_code)
+        self.fourkey_code = hash_access_code(access_code[:4])
 
     def update(self, data):
         if "access_code" in data and data["access_code"]:
             data["access_code"] = hash_access_code(data["access_code"])
-            return update_record(self, ("name", "role", "access_code"), data)
+            if not data["fourkey_code"]:
+                data["fourkey_code"] = hash_access_code(data["access_code"][:4])
+            else:
+                data["fourkey_code"] = hash_access_code(data["fourkey_code"])
+            return update_record(self, ("name", "role", "access_code", "fourkey_code"), data)
         else:
-            return update_record(self, ("name", "role"), data)
+            return update_record(self, ("name", "email", "role", "comment"), data)
 
     @property
     def serialize(self):
-        return {"id": self.id, "name": self.name, "role": self.role}
+        return {"id": self.id, "name": self.name, "email": self.email, "role": self.role, "comment": self.comment}
 
 
 class Option(BaseModel):

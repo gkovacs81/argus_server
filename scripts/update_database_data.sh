@@ -12,4 +12,4 @@ source etc/secrets.env
 
 . ./$PYENV/bin/activate
 
-src/data.py -c $1
+src/data.py $2 $3 $1

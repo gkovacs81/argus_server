@@ -25,11 +25,11 @@ app = Flask(__name__)
 # app.logger.debug("App folder: %s", argus_application_folder)
 
 POSTGRES = {
-    "user": os.environ["DB_USER"],
-    "pw": os.environ["DB_PASSWORD"],
-    "db": os.environ["DB_SCHEMA"],
-    "host": os.environ["DB_HOST"],
-    "port": os.environ["DB_PORT"],
+    "user": os.environ.get("DB_USER", None),
+    "pw": os.environ.get("DB_PASSWORD", None),
+    "db": os.environ.get("DB_SCHEMA", None),
+    "host": os.environ.get("DB_HOST", None),
+    "port": os.environ.get("DB_PORT", None),
 }
 app.config["SQLALCHEMY_DATABASE_URI"] = (
     "postgresql://%(user)s:%(pw)s@%(host)s:%(port)s/%(db)s" % POSTGRES
@@ -40,7 +40,7 @@ app.use_reloader = False
 # avoid reloading records from database after session commit
 db = SQLAlchemy(app, session_options={"expire_on_commit": False})
 
-from models import Alert, Sensor, SensorType, User, Zone, hash_access_code
+from models import *
 
 
 @app.route("/")
