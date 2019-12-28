@@ -4,7 +4,8 @@ from queue import Empty
 from threading import Thread
 from time import time
 
-from models import User, hash_access_code
+import models
+from models import User, Keypad, hash_access_code
 from monitoring.adapters.keypads.base import KeypadBase
 from monitoring.adapters.mock.keypad import MockKeypad
 from monitoring.constants import (LOG_ADKEYPAD, MONITOR_ARM_AWAY,
@@ -35,7 +36,8 @@ class Keypad(Thread):
         # check if running on Raspberry
         if os.uname()[4][:3] != "arm":
             self._keypad = MockKeypad(Keypad.CLOCK_PIN, Keypad.DATA_PIN)
-        elif type == "dsc":
+            type = "MOCK"
+        elif type == "DSC":
             with self._commands.mutex:
                 self._commands.queue.clear()
             self._keypad = DSCKeypad(Keypad.CLOCK_PIN, Keypad.DATA_PIN)
@@ -46,11 +48,20 @@ class Keypad(Thread):
             self._logger.error("Unknown keypad type: %s", type)
         self._logger.debug("Keypad created type: %s", type)
 
-    def run(self):
+    def configure(self):
         # load from db
         users = User.query.all()
         self._codes = [user.fourkey_code for user in users]
-        self.set_type("dsc")
+
+        keypad_settings = models.Keypad.query.first()
+        self.set_type(keypad_settings.type.name)
+        self._keypad.enabled = keypad_settings.enabled
+
+        if self._keypad.enabled:
+            self._keypad.initialise()
+
+    def run(self):
+        self.configure()
 
         try:
             self.communicate()
@@ -63,8 +74,6 @@ class Keypad(Thread):
         self._logger.info("Keypad manager stopped")
 
     def communicate(self):
-        self._keypad.initialise()
-
         last_press = int(time())
         presses = ""
         while True:
@@ -74,8 +83,9 @@ class Keypad(Thread):
                 self._logger.info("Command: %s", message)
 
                 if message == MONITOR_UPDATE_KEYPAD:
-                    # load keypad from db
-                    pass
+                    self._logger.info("Updating keypad")
+                    self.configure()
+                    last_press = int(time())
                 elif message in (MONITOR_ARM_AWAY, MONITOR_ARM_STAY):
                     self._keypad.set_armed(True)
                 elif message == MONITOR_DISARM:
@@ -86,34 +96,35 @@ class Keypad(Thread):
             except Empty:
                 pass
 
-            self._keypad.communicate()
+            if self._keypad.enabled:
+                self._keypad.communicate()
 
-            if int(time()) - last_press > 3 and presses:
-                presses = ""
-                self._logger.info("Cleared presses after 3 secs")
+                if int(time()) - last_press > 3 and presses:
+                    presses = ""
+                    self._logger.info("Cleared presses after 3 secs")
 
-            if self._keypad.pressed in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9"):
-                presses += self._keypad.pressed
-                last_press = time()
-            elif self._keypad.pressed in ("away", "stay"):
-                last_press = time()
-                pass
-            else:
-                # remove unknow codes from the list
-                try:
-                    self._keypad.pressed = ""
-                except IndexError:
+                if self._keypad.pressed in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9"):
+                    presses += self._keypad.pressed
+                    last_press = time()
+                elif self._keypad.pressed in ("away", "stay"):
+                    last_press = time()
                     pass
+                else:
+                    # remove unknow codes from the list
+                    try:
+                        self._keypad.pressed = ""
+                    except IndexError:
+                        pass
 
-            if presses:
-                self._logger.debug("Presses: %s", presses)
-            self._keypad.pressed = None
+                if presses:
+                    self._logger.debug("Presses: %s", presses)
+                self._keypad.pressed = None
 
-            if hash_access_code(presses) in self._codes:
-                self._logger.debug("Code: %s", presses)
-                self._responses.put(MONITOR_DISARM)
-                self._keypad.set_armed(False)
-                presses = ""
-            elif len(presses) == 4:
-                self._logger.info("Invalid code")
-                presses = ""
+                if hash_access_code(presses) in self._codes:
+                    self._logger.debug("Code: %s", presses)
+                    self._responses.put(MONITOR_DISARM)
+                    self._keypad.set_armed(False)
+                    presses = ""
+                elif len(presses) == 4:
+                    self._logger.info("Invalid code")
+                    presses = ""

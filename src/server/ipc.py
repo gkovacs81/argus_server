@@ -6,16 +6,18 @@ Created on 2017. szept. 13.
 
 import json
 import socket
-
 from os import environ
-from monitoring.constants import MONITOR_DISARM, MONITOR_UPDATE_CONFIG,\
-    MONITOR_ARM_AWAY, ARM_STAY, MONITOR_ARM_STAY, ARM_AWAY,\
-    MONITOR_UPDATE_DYNDNS, MONITOR_SYNC_CLOCK, MONITOR_SET_CLOCK
+
+from monitoring.constants import (ARM_AWAY, ARM_STAY, MONITOR_ARM_AWAY,
+                                  MONITOR_ARM_STAY, MONITOR_DISARM,
+                                  MONITOR_SET_CLOCK, MONITOR_SYNC_CLOCK,
+                                  MONITOR_UPDATE_CONFIG, MONITOR_UPDATE_DYNDNS,
+                                  MONITOR_UPDATE_KEYPAD)
 
 
 class IPCClient(object):
     '''
-    classdocs
+    Sending IPC messages from the REST API to the monitoring service
     '''
     _socket = None
 
@@ -55,7 +57,12 @@ class IPCClient(object):
         return self._send_message({
             'action': MONITOR_UPDATE_CONFIG
         })
-        
+
+    def update_keypad(self):
+        return self._send_message({
+            'action': MONITOR_UPDATE_KEYPAD
+        })
+
     def update_dyndns(self):
         return self._send_message({
             'action': MONITOR_UPDATE_DYNDNS
@@ -65,7 +72,7 @@ class IPCClient(object):
         return self._send_message({
             'action': MONITOR_SYNC_CLOCK
         })
-        
+
     def set_clock(self, settings):
         message = {
             'action': MONITOR_SET_CLOCK

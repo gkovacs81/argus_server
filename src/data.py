@@ -45,11 +45,6 @@ def env_dev():
         alert.sensors = []
     db.session.commit()
 
-    Sensor.query.delete()
-    SensorType.query.delete()
-    Zone.query.delete()
-    Alert.query.delete()
-
     z1 = Zone(name="Azonnali", description="Azonnali riasztás")
     z2 = Zone(name="Távozó késleltetett", away_delay=20, description="Távozáskor/érkezésekor késletetett")
     z3 = Zone(name="Maradó", description="Maradó élesítés esetén nem riaszt")
@@ -63,14 +58,21 @@ def env_dev():
     st4 = SensorType(4, 'Break', 'Break sensor')
     db.session.add_all([st1, st2, st3, st4])
 
-    s1 = Sensor(channel=0, zone=z2, sensor_type=st1, description="Garázs bejárati ajtó feletti mozgésérzékelő")
-    s2 = Sensor(channel=1, zone=z5, sensor_type=st1, description="Előszoba mozgésérzékelő")
-    s3 = Sensor(channel=2, zone=z4, sensor_type=st1, description="Étkező/konyha mozgésérzékelő")
-    s4 = Sensor(channel=3, zone=z1, sensor_type=st1, description="Nappali mozgésérzékelő")
-    s5 = Sensor(channel=4, zone=z3, sensor_type=st1, description="Gyerekszoba mozgésérzékelő")
-    s6 = Sensor(channel=5, zone=z3, sensor_type=st1, description="Hálószoba mozgésérzékelő")
-    s7 = Sensor(channel=6, zone=z1, sensor_type=st4, description="Tamper kör")
+    s1 = Sensor(channel=0, sensor_type=st1, zone=z2, description="Garázs bejárati ajtó feletti mozgésérzékelő")
+    s2 = Sensor(channel=1, sensor_type=st1, zone=z5, description="Előszoba mozgésérzékelő")
+    s3 = Sensor(channel=2, sensor_type=st1, zone=z4, description="Étkező/konyha mozgésérzékelő")
+    s4 = Sensor(channel=3, sensor_type=st1, zone=z1, description="Nappali mozgésérzékelő")
+    s5 = Sensor(channel=4, sensor_type=st1, zone=z3, description="Gyerekszoba mozgésérzékelő")
+    s6 = Sensor(channel=5, sensor_type=st1, zone=z3, description="Hálószoba mozgésérzékelő")
+    s7 = Sensor(channel=6, sensor_type=st4, zone=z1, description="Tamper kör")
     db.session.add_all([s1, s2, s3, s4, s5, s6, s7])
+
+    kt1 = KeypadType(1, 'DSC', 'DSC keybus (DSC PC-1555RKZ)')
+    db.session.add_all([kt1])
+
+    k1 = Keypad(keypad_type=kt1)
+    db.session.add_all([k1])
+
 
     db.session.commit()
 

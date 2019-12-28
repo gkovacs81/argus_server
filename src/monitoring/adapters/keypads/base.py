@@ -5,6 +5,7 @@ class KeypadBase:
         self._clock = clock_pin
         self._data = data_pin
         self.pressed = None
+        self.enabled = True
 
     def initialise(self):
         pass

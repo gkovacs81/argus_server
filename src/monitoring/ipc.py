@@ -6,26 +6,19 @@ Created on 2017. szept. 7.
 import json
 import logging
 import socket
-
-from os import path, makedirs, remove, environ, chmod, chown
+from os import chmod, chown, environ, makedirs, path, remove
 from threading import Thread
 
-from monitoring.constants import (
-    MONITOR_DISARM,
-    MONITOR_UPDATE_CONFIG,
-    MONITOR_ARM_AWAY,
-    MONITOR_ARM_STAY,
-    THREAD_IPC,
-    LOG_IPC,
-    MONITOR_UPDATE_DYNDNS,
-    MONITOR_SYNC_CLOCK,
-    MONITOR_SET_CLOCK,
-)
-from monitoring import storage
-from server.tools import enable_certbot_job, enable_dyndns_job
-from dyndns import update_ip
 from certificates import update_certificates
-from tools.clock import sync_clock, set_clock
+from dyndns import update_ip
+from monitoring import storage
+from monitoring.constants import (LOG_IPC, MONITOR_ARM_AWAY, MONITOR_ARM_STAY,
+                                  MONITOR_DISARM, MONITOR_SET_CLOCK,
+                                  MONITOR_SYNC_CLOCK, MONITOR_UPDATE_CONFIG,
+                                  MONITOR_UPDATE_DYNDNS, MONITOR_UPDATE_KEYPAD,
+                                  THREAD_IPC)
+from server.tools import enable_certbot_job, enable_dyndns_job
+from tools.clock import set_clock, sync_clock
 
 MONITOR_INPUT_SOCKET = environ["MONITOR_INPUT_SOCKET"]
 
@@ -90,6 +83,9 @@ class IPCServer(Thread):
         elif message["action"] == MONITOR_UPDATE_CONFIG:
             self._logger.info("Update configuration...")
             self._broadcaster.send_message(MONITOR_UPDATE_CONFIG)
+        elif message["action"] == MONITOR_UPDATE_KEYPAD:
+            self._logger.info("Update keypad...")
+            self._broadcaster.send_message(MONITOR_UPDATE_KEYPAD)
         elif message["action"] == MONITOR_UPDATE_DYNDNS:
             self._logger.info("Update dyndns...")
             # update configuration

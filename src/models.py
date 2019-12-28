@@ -123,7 +123,7 @@ class Sensor(BaseModel):
     type = db.relationship("SensorType", backref=db.backref("sensor_type", lazy="dynamic"))
     alerts = db.relationship("AlertSensor", back_populates="sensor")
 
-    def __init__(self, channel=0, zone=None, sensor_type=0, description=None):
+    def __init__(self, channel, sensor_type, zone=None, description=None):
         self.channel = channel
         self.zone = zone
         self.type = sensor_type
@@ -305,3 +305,45 @@ class Option(BaseModel):
         filter_keys(filtered_value, ["smtp_password"])
         filter_keys(filtered_value, ["password"])
         return {"name": self.name, "section": self.section, "value": json.dumps(filtered_value)}
+
+
+class Keypad(BaseModel):
+    """Model for keypad table"""
+
+    __tablename__ = "keypad"
+
+    id = db.Column(db.Integer, primary_key=True)
+    enabled = db.Column(db.Boolean, default=True)
+
+    type_id = db.Column(db.Integer, db.ForeignKey("keypad_type.id"), nullable=False)
+    type = db.relationship("KeypadType", backref=db.backref("keypad_type", lazy="dynamic"))
+
+    def __init__(self, keypad_type, enabled=True):
+        self.type = keypad_type
+        self.enabled = enabled
+
+    def update(self, data):
+        return update_record(self, ("enabled", "type_id"), data)
+
+    @property
+    def serialize(self):
+        return {"id": self.id, "type_id": self.type_id, "enabled": self.enabled}
+
+
+class KeypadType(BaseModel):
+    """Model for keypad type table"""
+
+    __tablename__ = "keypad_type"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(32))
+    description = db.Column(db.String)
+
+    def __init__(self, id, name, description):
+        self.id = id
+        self.name = name
+        self.description = description
+
+    @property
+    def serialize(self):
+        return {"id": self.id, "name": self.name, "description": self.description}

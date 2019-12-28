@@ -401,6 +401,42 @@ def sync_clock():
     return jsonify(True)
 
 
+@app.route("/api/keypad/<int:keypad_id>", methods=["GET", "PUT", "DELETE"])
+@authenticated()
+def keypad(keypad_id):
+    '''
+    Limited to handle only one keypad!
+    '''
+    if request.method == "GET":
+        keypad = Keypad.query.first()
+        if keypad:
+            return jsonify(keypad.serialize)
+        abort(404)
+    elif request.method == "DELETE":
+        keypad = Keypad.query.first()
+        keypad.deleted = True
+        db.session.commit()
+        ipc_client = IPCClient()
+        ipc_client.update_keypad()
+        return jsonify(True)
+    elif request.method == "PUT":
+        keypad = Keypad.query.get(keypad_id)
+        if keypad.update(request.json):
+            db.session.commit()
+            ipc_client = IPCClient()
+            ipc_client.update_keypad()
+        return jsonify(True)
+
+    return jsonify({"error": "unknonw action"})
+
+
+@app.route("/api/keypadtypes", methods=["GET"])
+@authenticated()
+def keypadtypes():
+    # app.logger.debug("Request: %s", request.args.get('alerting'))
+    return jsonify([i.serialize for i in KeypadType.query.all()])
+
+
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def catch_all(path):
