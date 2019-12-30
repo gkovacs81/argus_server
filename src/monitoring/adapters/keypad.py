@@ -54,8 +54,12 @@ class Keypad(Thread):
         self._codes = [user.fourkey_code for user in users]
 
         keypad_settings = models.Keypad.query.first()
-        self.set_type(keypad_settings.type.name)
-        self._keypad.enabled = keypad_settings.enabled
+        if keypad_settings:
+            self.set_type(keypad_settings.type.name)
+            self._keypad.enabled = keypad_settings.enabled
+        else:
+            self.set_type(None)
+            self._keypad.enabled = False
 
         if self._keypad.enabled:
             self._keypad.initialise()

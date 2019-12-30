@@ -413,7 +413,7 @@ def keypad(keypad_id):
             return jsonify(keypad.serialize)
         abort(404)
     elif request.method == "DELETE":
-        keypad = Keypad.query.first()
+        keypad = Keypad.query.get(keypad_id)
         keypad.deleted = True
         db.session.commit()
         ipc_client = IPCClient()
@@ -421,6 +421,8 @@ def keypad(keypad_id):
         return jsonify(True)
     elif request.method == "PUT":
         keypad = Keypad.query.get(keypad_id)
+        if not keypad:
+            keypad = Keypad(keypad_type=KeypadType.query.get(request.json["type_id"]))
         if keypad.update(request.json):
             db.session.commit()
             ipc_client = IPCClient()
