@@ -11,7 +11,7 @@ from gsmmodem.modem import GsmModem
 from gsmmodem.exceptions import PinRequiredError, IncorrectPinError, TimeoutException, CmsError,\
     CommandError
 from monitoring.constants import LOG_ADGSM
-from models import Option
+from models import db, Option
 from time import sleep
 
 
@@ -21,7 +21,7 @@ class GSM(object):
         self._logger = logging.getLogger(LOG_ADGSM)
 
     def setup(self):
-        section = Option.query.filter_by(name='notifications', section='gsm').first()
+        section = db.create_scoped_session().query(Option).filter_by(name='notifications', section='gsm').first()
         self._options = json.loads(section.value) if section else {'pin_code': ''}
         self._options['port'] = os.environ['GSM_PORT']
         self._options['baud'] = os.environ['GSM_PORT_BAUD']
@@ -62,6 +62,8 @@ class GSM(object):
                     return False
 
     def destroy(self):
+        self._db_session.close()
+
         if self._modem is not None:
             self._modem.close()
 

@@ -9,7 +9,7 @@ from threading import Thread
 
 from monitoring.notifications.templates import ALERT_STARTED_EMAIL, ALERT_STOPPED_EMAIL, ALERT_STARTED_SMS, ALERT_STOPPED_SMS
 from monitoring.constants import LOG_NOTIFIER, THREAD_NOTIFIER
-from models import Option
+from models import db, Option
 from monitoring.constants import MONITOR_STOP, MONITOR_UPDATE_CONFIG
 
 # check if running on Raspberry
@@ -90,13 +90,18 @@ class Notifier(Thread):
     def __init__(self):
         super(Notifier, self).__init__(name=THREAD_NOTIFIER)
         self._logger = logging.getLogger(LOG_NOTIFIER)
-        self._options = self.get_options()
         self._gsm = GSM()
         self._messages = []
+        self._options = None
+        self._db_session = None
 
     def run(self):
-        self._logger.info("Notifier started for subscriptions: {}".format(
-            self._options['subscriptions']))
+        self._logger.info("Notifier started...")
+
+        self._db_session = db.create_scoped_session()
+        self._options = self.get_options()
+        self._logger.info("Subscription configuration: %s", self._options['subscriptions'])
+
         self._gsm.setup()
         while True:
             message = None
@@ -130,12 +135,13 @@ class Notifier(Thread):
                         self._logger.debug("Deleted message after max retry (%s): %s",
                                            Notifier.MAX_RETRY, self._messages.pop(0))
 
+        self._db_session.close()
         self._logger.info("Notifier stopped")
 
     def get_options(self):
         options = {}
         for section_name in ('email', 'gsm', 'subscriptions'):
-            section = Option.query.filter_by(
+            section = self._db_session.query(Option).filter_by(
                 name='notifications', section=section_name).first()
             options[section_name] = json.loads(
                 section.value) if section else ''

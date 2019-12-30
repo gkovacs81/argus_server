@@ -37,13 +37,17 @@ class SensorAlert(Thread):
         Constructor
         """
         super(SensorAlert, self).__init__(name=THREAD_ALERT)
+        self._logger = logging.getLogger(LOG_ALERT)
         self._sensor_id = sensor_id
         self._arm_type = arm_type
         self._stop_event = stop_event
-        self._logger = logging.getLogger(LOG_ALERT)
+        self._db_session = None
 
     def run(self):
-        sensor = Sensor.query.get(self._sensor_id)
+        self._db_session = db.create_scoped_session()
+
+        sensor = self._db_session.query(Sensor).get(self._sensor_id)
+
         if self._arm_type == ARM_AWAY:
             delay = sensor.zone.away_delay
         elif self._arm_type == ARM_STAY:
@@ -52,6 +56,8 @@ class SensorAlert(Thread):
             delay = sensor.zone.disarmed_delay
         else:
             self._logger.error("Unknown arm type = %s!", self._arm_type)
+
+        self._db_session.close()
 
         self._logger.info("Alert started on channel(%s) waiting %s sec before starting syren", sensor.channel, delay)
         if not self._stop_event.wait(delay):
@@ -90,8 +96,12 @@ class SyrenAlert(Thread):
         self._logger = logging.getLogger(LOG_ALERT)
         self._syren = SyrenAdapter()
         self._alert = None
+        self._db_session = None
 
     def run(self):
+        if not self._db_session:
+            self._db_session = db.create_scoped_session()
+
         self.start_alert()
         while not self._stop_event.is_set():
             self._syren.alert(True)
@@ -111,14 +121,15 @@ class SyrenAlert(Thread):
             self.handle_sensors()
 
         self.stop_alert()
+        self._db_session.close()
         self._logger.info("Syren stopped")
 
     def start_alert(self):
         start_time = datetime.now(pytz.timezone("CET"))
         self._alert = Alert(self._arm_type, start_time=start_time, sensors=[])
-        db.session.add(self._alert)
+        self._db_session.add(self._alert)
         if not self.handle_sensors():
-            db.session.commit()
+            self._db_session.commit()
 
         send_alert_state(self._alert.serialize)
         Notifier.notify_alert_started(self._alert.id, list(map(lambda alert_sensor: alert_sensor.sensor.description, self._alert.sensors)), start_time)
@@ -129,7 +140,7 @@ class SyrenAlert(Thread):
             self.handle_sensors()
             self._syren.alert(False)
             self._alert.end_time = datetime.now(pytz.timezone("CET"))
-            db.session.commit()
+            self._db_session.commit()
 
             send_alert_state(None)
             send_syren_state(None)
@@ -140,7 +151,7 @@ class SyrenAlert(Thread):
         try:
             while True:
                 sensor_id = self._sensor_queue.get(False)
-                sensor = Sensor.query.get(sensor_id)
+                sensor = self._db_session.query(Sensor).get(sensor_id)
 
                 # check if already added to the alert
                 already_added = False
@@ -160,6 +171,6 @@ class SyrenAlert(Thread):
             pass
 
         if sensor_added:
-            db.session.commit()
+            self._db_session.commit()
 
         return sensor_added

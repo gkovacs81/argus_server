@@ -5,7 +5,7 @@ from threading import Thread
 from time import time
 
 import models
-from models import User, Keypad, hash_access_code
+from models import db, User, Keypad, hash_access_code
 from monitoring.adapters.keypads.base import KeypadBase
 from monitoring.adapters.mock.keypad import MockKeypad
 from monitoring.constants import (LOG_ADKEYPAD, MONITOR_ARM_AWAY,
@@ -31,6 +31,7 @@ class Keypad(Thread):
         self._responses = responses
         self._codes = []
         self._keypad: KeypadBase = None
+        self._db_session = None
 
     def set_type(self, type):
         # check if running on Raspberry
@@ -50,10 +51,10 @@ class Keypad(Thread):
 
     def configure(self):
         # load from db
-        users = User.query.all()
+        users = self._db_session.query(User).all()
         self._codes = [user.fourkey_code for user in users]
 
-        keypad_settings = models.Keypad.query.first()
+        keypad_settings = self._db_session.query(models.Keypad).first()
         if keypad_settings:
             self.set_type(keypad_settings.type.name)
             self._keypad.enabled = keypad_settings.enabled
@@ -65,6 +66,7 @@ class Keypad(Thread):
             self._keypad.initialise()
 
     def run(self):
+        self._db_session = db.create_scoped_session()
         self.configure()
 
         try:
@@ -75,6 +77,7 @@ class Keypad(Thread):
         except Exception:
             self._logger.exception("Keypad communication failed!")
 
+        self._db_session.close()
         self._logger.info("Keypad manager stopped")
 
     def communicate(self):

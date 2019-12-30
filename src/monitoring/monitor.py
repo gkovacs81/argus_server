@@ -58,6 +58,7 @@ class Monitor(Thread):
         self._power_source = None
         self._alerts = {}
         self._stop_alert = Event()
+        self._db_session = None
 
         self._logger.info('Monitoring created')
         storage.set('state', MONITORING_STARTUP)
@@ -65,6 +66,7 @@ class Monitor(Thread):
 
     def run(self):
         self._logger.info('Monitoring started')
+        self._db_session = db.create_scoped_session()
 
         # wait some seconds to build up socket IO connection before emit messages
         sleep(5)
@@ -117,6 +119,7 @@ class Monitor(Thread):
             self.handle_alerts()
 
         self._stop_alert.set()
+        self._db_session.close()
         self._logger.info("Monitoring stopped")
 
     def check_power(self):
@@ -159,7 +162,7 @@ class Monitor(Thread):
 
         # !!! delete old sensors before load again
         self._sensors = []
-        self._sensors = Sensor.query.filter_by(deleted=False).all()
+        self._sensors = self._db_session.query(Sensor).filter_by(deleted=False).all()
         self._logger.debug("Sensors reloaded!")
 
         if len(self._sensors) > self._sensorAdapter.channel_count:
@@ -202,27 +205,27 @@ class Monitor(Thread):
 
     def cleanup_database(self):
         changed = False
-        for sensor in Sensor.query.all():
+        for sensor in self._db_session.query(Sensor).all():
             if sensor.alert:
                 sensor.alert = False
                 changed = True
                 self._logger.debug('Cleared sensor')
 
-        for alert in Alert.query.filter_by(end_time=None).all():
+        for alert in self._db_session.query(Alert).filter_by(end_time=None).all():
             alert.end_time = datetime.fromtimestamp(DEFAULT_DATETIME)
             self._logger.debug('Cleared alert')
             changed = True
 
         if changed:
             self._logger.debug('Cleared db')
-            db.session.commit()
+            self._db_session.commit()
         else:
             self._logger.debug('Cleared nothing')
 
     def save_sensor_references(self, references):
         for sensor in self._sensors:
             sensor.reference_value = references[sensor.channel]
-            db.session.commit()
+            self._db_session.commit()
 
     def measure_sensor_references(self):
         measurements = []
@@ -263,7 +266,7 @@ class Monitor(Thread):
                 found_alert = True
 
         if changes:
-            db.session.commit()
+            self._db_session.commit()
             send_sensors_state(found_alert)
 
     def handle_alerts(self):
@@ -293,4 +296,4 @@ class Monitor(Thread):
 
         if changes:
             self._logger.debug("Save sensor changes")
-            db.session.commit()
+            self._db_session.commit()
