@@ -153,7 +153,7 @@ class Alert(BaseModel):
     __tablename__ = "alert"
 
     id = db.Column(db.Integer, primary_key=True)
-    arm_type = db.Column(db.String)
+    alert_type = db.Column(db.String)
     start_time = db.Column(db.DateTime(timezone=True))
     end_time = db.Column(db.DateTime(timezone=True))
     sensors = db.relationship("AlertSensor", back_populates="alert")
