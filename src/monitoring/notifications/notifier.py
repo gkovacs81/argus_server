@@ -170,6 +170,7 @@ class Notifier(Thread):
                     success |= self.notify_alert_stopped_email(message)
         except (KeyError, TypeError):
             self._logger.info("No subscription configured!")
+        except Exception:
             self._logger.exception("Sending message failed!")
 
         return not (not success and has_subscription)
