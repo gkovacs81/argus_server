@@ -13,7 +13,7 @@ from threading import Thread, BoundedSemaphore
 from models import db, Alert, AlertSensor, Sensor
 from monitoring.adapters.syren import SyrenAdapter
 from monitoring.socket_io import send_syren_state, send_alert_state, send_system_state_change
-from monitoring.constants import ARM_AWAY, ARM_STAY, ARM_DISARM, MONITORING_SABOTAGE, LOG_ALERT, THREAD_ALERT
+from monitoring.constants import ALERT_SABOTAGE, MONITORING_SABOTAGE, LOG_ALERT, THREAD_ALERT
 from multiprocessing import Queue
 from queue import Empty
 from monitoring import storage
@@ -25,46 +25,31 @@ SYREN_DEFAULT_SUSPEND_TIME = 5
 
 
 class SensorAlert(Thread):
-    """
-    classdocs
-    """
+    '''
+    Handling of alerts from sensors and trigger syren alert.
+    '''
 
     _syren_alert = None
     _sensor_queue = Queue()
 
-    def __init__(self, sensor_id, arm_type, stop_event):
+    def __init__(self, sensor_id, delay, alert_type, stop_event):
         """
         Constructor
         """
         super(SensorAlert, self).__init__(name=THREAD_ALERT)
         self._logger = logging.getLogger(LOG_ALERT)
         self._sensor_id = sensor_id
-        self._arm_type = arm_type
+        self._delay = delay
+        self._alert_type = alert_type
         self._stop_event = stop_event
-        self._db_session = None
 
     def run(self):
-        self._db_session = db.create_scoped_session()
-
-        sensor = self._db_session.query(Sensor).get(self._sensor_id)
-
-        if self._arm_type == ARM_AWAY:
-            delay = sensor.zone.away_delay
-        elif self._arm_type == ARM_STAY:
-            delay = sensor.zone.stay_delay
-        elif self._arm_type == ARM_DISARM:
-            delay = sensor.zone.disarmed_delay
-        else:
-            self._logger.error("Unknown arm type = %s!", self._arm_type)
-
-        self._db_session.close()
-
-        self._logger.info("Alert started on channel(%s) waiting %s sec before starting syren", sensor.channel, delay)
-        if not self._stop_event.wait(delay):
-            self._logger.info("Start syren because not disarmed in %s secs", delay)
-            SyrenAlert.start_syren(self._arm_type, SensorAlert._sensor_queue, self._stop_event)
+        self._logger.info("Alert (%s) started on sensor (id:%s) waiting %s sec before starting syren", self._alert_type, self._sensor_id, self._delay)
+        if not self._stop_event.wait(self._delay):
+            self._logger.info("Start syren because not disarmed (%s) sensor (id:%s) in %s secs", self._alert_type, self._sensor_id, self._delay)
+            SyrenAlert.start_syren(self._alert_type, SensorAlert._sensor_queue, self._stop_event)
             SensorAlert._sensor_queue.put(self._sensor_id)
-            if self._arm_type == ARM_DISARM:
+            if self._alert_type == ALERT_SABOTAGE:
                 storage.set("state", MONITORING_SABOTAGE)
                 send_system_state_change(MONITORING_SABOTAGE)
         else:
@@ -72,15 +57,18 @@ class SensorAlert(Thread):
 
 
 class SyrenAlert(Thread):
+    '''
+    Handling of syren alerts.
+    '''
 
     _semaphore = BoundedSemaphore()
     _alert = None
 
     @classmethod
-    def start_syren(cls, arm_type, sensor_queue, stop_event):
+    def start_syren(cls, alert_type, sensor_queue, stop_event):
         with cls._semaphore:
             if not cls._alert:
-                cls._alert = SyrenAlert(arm_type, sensor_queue, stop_event)
+                cls._alert = SyrenAlert(alert_type, sensor_queue, stop_event)
                 cls._alert.start()
             return cls._alert
 
@@ -90,7 +78,7 @@ class SyrenAlert(Thread):
 
     def __init__(self, arm_type, sensor_queue, stop_event):
         super(SyrenAlert, self).__init__(name=THREAD_ALERT)
-        self._arm_type = arm_type
+        self._alert_type = arm_type
         self._sensor_queue = sensor_queue
         self._stop_event = stop_event
         self._logger = logging.getLogger(LOG_ALERT)
@@ -126,7 +114,7 @@ class SyrenAlert(Thread):
 
     def start_alert(self):
         start_time = datetime.now(pytz.timezone("CET"))
-        self._alert = Alert(self._arm_type, start_time=start_time, sensors=[])
+        self._alert = Alert(self._alert_type, start_time=start_time, sensors=[])
         self._db_session.add(self._alert)
         if not self.handle_sensors():
             self._db_session.commit()
