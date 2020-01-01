@@ -33,7 +33,7 @@ class IPCClient(object):
 
     def get_arm(self):
         return self._send_message({
-            'action':'get_arm'
+            'action': 'get_arm'
         })
 
     def arm(self, arm_type):

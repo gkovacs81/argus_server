@@ -21,7 +21,7 @@ from monitoring.constants import THREAD_MONITOR, LOG_MONITOR, MONITORING_STARTUP
     ARM_DISARM, MONITOR_STOP, MONITOR_ARM_AWAY, ARM_AWAY, MONITORING_ARMED,\
     MONITOR_ARM_STAY, ARM_STAY, MONITOR_DISARM, MONITORING_READY,\
     MONITOR_UPDATE_CONFIG, MONITORING_UPDATING_CONFIG, MONITORING_INVALID_CONFIG,\
-    MONITORING_SABOTAGE
+    MONITORING_SABOTAGE, ALERT_AWAY, ALERT_STAY, ALERT_SABOTAGE
 from monitoring.socket_io import send_system_state_change, send_sensors_state, \
     send_arm_state, send_alert_state, send_syren_state
 from monitoring import storage
@@ -102,7 +102,8 @@ class Monitor(Thread):
                 elif action == MONITOR_DISARM:
                     current_state = storage.get('state')
                     current_arm = storage.get('arm')
-                    if current_state == MONITORING_ARMED and (current_arm == ARM_AWAY or current_arm == ARM_STAY):
+                    if current_state == MONITORING_ARMED and current_arm in (ARM_AWAY, ARM_STAY) or \
+                       current_state == MONITORING_SABOTAGE:
                         storage.set('arm', ARM_DISARM)
                         send_arm_state(ARM_DISARM)
                         storage.set('state', MONITORING_READY)
@@ -270,25 +271,35 @@ class Monitor(Thread):
             send_sensors_state(found_alert)
 
     def handle_alerts(self):
-        # check for alerting sensors if armed
+        '''
+        Checking for alerting sensors if armed
+        '''
 
         # save current state to avoid concurrency
-        current_state = storage.get('state')
         current_arm = storage.get('arm')
 
         changes = False
         for sensor in self._sensors:
             if sensor.alert and sensor.id not in self._alerts and sensor.enabled:
-                if sensor.zone.disarmed_delay is not None and current_state == MONITORING_READY or \
-                   sensor.zone.disarmed_delay is not None and current_state == MONITORING_SABOTAGE or \
-                   sensor.zone.away_delay is not None and current_arm == ARM_AWAY or \
-                   sensor.zone.stay_delay is not None and current_arm == ARM_STAY:
-                    self._alerts[sensor.id] = {'alert': monitoring.alert.SensorAlert(sensor.id, current_arm, self._stop_alert)}
+                alert_type = None
+                # sabotage has higher priority
+                if sensor.zone.disarmed_delay is not None:
+                    alert_type = ALERT_SABOTAGE
+                    delay = sensor.zone.disarmed_delay
+                elif current_arm == ARM_AWAY and sensor.zone.away_delay is not None:
+                    alert_type = ALERT_AWAY
+                    delay = sensor.zone.away_delay
+                elif current_arm == ARM_STAY and sensor.zone.stay_delay is not None:
+                    alert_type = ALERT_STAY
+                    delay = sensor.zone.stay_delay
+
+                if alert_type:
+                    self._alerts[sensor.id] = {'alert': monitoring.alert.SensorAlert(sensor.id, delay, alert_type, self._stop_alert)}
                     self._alerts[sensor.id]['alert'].start()
                     changes = True
                     self._stop_alert.clear()
             elif not sensor.alert and sensor.id in self._alerts:
-                if self._alerts[sensor.id]['alert']._arm_type == ARM_DISARM:
+                if self._alerts[sensor.id]['alert']._alert_type == ALERT_SABOTAGE:
                     # stop sabotage
                     storage.set('state', MONITORING_READY)
                     send_system_state_change(MONITORING_READY)

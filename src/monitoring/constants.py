@@ -5,24 +5,7 @@ Created on 2017. dec. 3.
 '''
 from logging import DEBUG, INFO
 
-# INTERNAL COMMANDS
-# monitoring system commands
-MONITOR_ARM_AWAY = 'monitor_arm_away'
-MONITOR_ARM_STAY = 'monitor_arm_stay'
-MONITOR_DISARM = 'monitor_disarm'
-MONITOR_UPDATE_CONFIG = 'monitor_update_config'
-MONITOR_UPDATE_KEYPAD = 'monitor_update_keypad'
-MONITOR_UPDATE_DYNDNS = 'monitor_update_dyndns'
-MONITOR_STOP = 'monitor_stop'
-MONITOR_SYNC_CLOCK = 'monitor_sync_clock'
-MONITOR_SET_CLOCK = 'monitor_set_clock'
-
-# arm types
-ARM_AWAY = 'away'
-ARM_STAY = 'stay'
-ARM_DISARM = 'disarm'
-
-
+# Threads and logging
 THREAD_SERVICE  = 'Service'
 THREAD_MONITOR  = 'Monitor'
 THREAD_IPC      = 'IPC'
@@ -56,9 +39,30 @@ LOGGING_MODULES = [
     (LOG_ADKEYPAD, INFO)
 ]
 
+# INTERNAL CONSTANTS
+# monitoring system commands
+MONITOR_ARM_AWAY = 'monitor_arm_away'
+MONITOR_ARM_STAY = 'monitor_arm_stay'
+MONITOR_DISARM = 'monitor_disarm'
+MONITOR_UPDATE_CONFIG = 'monitor_update_config'
+MONITOR_UPDATE_KEYPAD = 'monitor_update_keypad'
+MONITOR_UPDATE_DYNDNS = 'monitor_update_dyndns'
+MONITOR_STOP = 'monitor_stop'
+MONITOR_SYNC_CLOCK = 'monitor_sync_clock'
+MONITOR_SET_CLOCK = 'monitor_set_clock'
 
 '''---------------------------------------------------------------'''
 # CONSTANTS USED ALSO BY THE WEB APPLICATION
+# arm types
+ARM_AWAY = 'arm_away'
+ARM_STAY = 'arm_stay'
+ARM_DISARM = 'disarm'
+
+# alert types
+ALERT_AWAY = 'alert_away'
+ALERT_STAY = 'alert_stay'
+ALERT_SABOTAGE = 'alert_sabotage'
+
 # monitoring system states
 MONITORING_STARTUP = 'monitoring_startup'
 MONITORING_READY = 'monitoring_ready'

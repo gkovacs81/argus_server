@@ -158,8 +158,8 @@ class Alert(BaseModel):
     end_time = db.Column(db.DateTime(timezone=True))
     sensors = db.relationship("AlertSensor", back_populates="alert")
 
-    def __init__(self, arm_type, start_time, sensors, end_time=None):
-        self.arm_type = arm_type
+    def __init__(self, alert_type, start_time, sensors, end_time=None):
+        self.alert_type = alert_type
         self.start_time = start_time
         self.end_time = end_time
         self.sensors = sensors
@@ -169,7 +169,7 @@ class Alert(BaseModel):
         locale.setlocale(locale.LC_ALL, "")
         return {
             "id": self.id,
-            "arm_type": self.arm_type,
+            "alert_type": self.alert_type,
             "start_time": self.start_time.replace(microsecond=0, tzinfo=None).isoformat(sep=" "),
             "end_time": self.end_time.replace(microsecond=0, tzinfo=None).isoformat(sep=" ") if self.end_time else "",
             "sensors": [
