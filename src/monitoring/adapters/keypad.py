@@ -1,11 +1,14 @@
 import logging
 import os
+from multiprocessing import Process
 from queue import Empty
-from threading import Thread
 from time import time
 
+from sqlalchemy.engine import create_engine
+from sqlalchemy.orm.session import sessionmaker
+
 import models
-from models import db, User, Keypad, hash_access_code
+from models import Keypad, User, hash_access_code
 from monitoring.adapters.keypads.base import KeypadBase
 from monitoring.adapters.mock.keypad import MockKeypad
 from monitoring.constants import (LOG_ADKEYPAD, MONITOR_ARM_AWAY,
@@ -19,7 +22,7 @@ if os.uname()[4][:3] == "arm":
 COMMUNICATION_PERIOD = 0.5  # sec
 
 
-class Keypad(Thread):
+class Keypad(Process):
     # pins
     CLOCK_PIN = 5
     DATA_PIN = 0
@@ -31,7 +34,6 @@ class Keypad(Thread):
         self._responses = responses
         self._codes = []
         self._keypad: KeypadBase = None
-        self._db_session = None
 
     def set_type(self, type):
         # check if running on Raspberry
@@ -39,8 +41,6 @@ class Keypad(Thread):
             self._keypad = MockKeypad(Keypad.CLOCK_PIN, Keypad.DATA_PIN)
             type = "MOCK"
         elif type == "DSC":
-            with self._commands.mutex:
-                self._commands.queue.clear()
             self._keypad = DSCKeypad(Keypad.CLOCK_PIN, Keypad.DATA_PIN)
         elif type is None:
             self._logger.debug("Keypad removed")
@@ -51,33 +51,37 @@ class Keypad(Thread):
 
     def configure(self):
         # load from db
-        users = self._db_session.query(User).all()
+        # when hangs here check workaround in Notifier
+        uri = f"postgresql+psycopg2://{os.environ.get('DB_USER', None)}:{os.environ.get('DB_PASSWORD', None)}@{os.environ.get('DB_HOST', None)}:{os.environ.get('DB_PORT', None)}/{os.environ.get('DB_SCHEMA', None)}"
+        engine = create_engine(uri)
+        Session = sessionmaker(bind=engine)
+        db_session = Session()
+
+        users = db_session.query(User).all()
         self._codes = [user.fourkey_code for user in users]
 
-        keypad_settings = self._db_session.query(models.Keypad).first()
+        keypad_settings = db_session.query(models.Keypad).first()
         if keypad_settings:
             self.set_type(keypad_settings.type.name)
             self._keypad.enabled = keypad_settings.enabled
         else:
             self.set_type(None)
-            self._keypad.enabled = False
 
-        if self._keypad.enabled:
+        if self._keypad and self._keypad.enabled:
             self._keypad.initialise()
 
+        db_session.close()
+
     def run(self):
-        self._db_session = db.create_scoped_session()
         self.configure()
 
         try:
             self.communicate()
         except KeyboardInterrupt:
-            self._logger.error("Keyboard interrupt")
-            pass
+            self._logger.info("Keyboard interrupt")
         except Exception:
             self._logger.exception("Keypad communication failed!")
 
-        self._db_session.close()
         self._logger.info("Keypad manager stopped")
 
     def communicate(self):
@@ -85,7 +89,7 @@ class Keypad(Thread):
         presses = ""
         while True:
             try:
-                # self._logger.debug("Wait for command...")
+                self._logger.debug("Wait for command...")
                 message = self._commands.get(timeout=COMMUNICATION_PERIOD)
                 self._logger.info("Command: %s", message)
 
@@ -93,9 +97,10 @@ class Keypad(Thread):
                     self._logger.info("Updating keypad")
                     self.configure()
                     last_press = int(time())
-                elif message in (MONITOR_ARM_AWAY, MONITOR_ARM_STAY):
+                elif message in (MONITOR_ARM_AWAY, MONITOR_ARM_STAY) and self._keypad:
+                    self._logger.info("Keypad armed")
                     self._keypad.set_armed(True)
-                elif message == MONITOR_DISARM:
+                elif message == MONITOR_DISARM and self._keypad:
                     self._keypad.set_armed(False)
                 elif message == MONITOR_STOP:
                     break
@@ -103,7 +108,7 @@ class Keypad(Thread):
             except Empty:
                 pass
 
-            if self._keypad.enabled:
+            if self._keypad and self._keypad.enabled:
                 self._keypad.communicate()
 
                 if int(time()) - last_press > 3 and presses:

@@ -2,15 +2,18 @@ import json
 import logging
 import os
 import smtplib
-
 from queue import Empty
 from smtplib import SMTPException
 from threading import Thread
+from time import sleep
 
-from monitoring.notifications.templates import ALERT_STARTED_EMAIL, ALERT_STOPPED_EMAIL, ALERT_STARTED_SMS, ALERT_STOPPED_SMS
-from monitoring.constants import LOG_NOTIFIER, THREAD_NOTIFIER
 from models import db, Option
-from monitoring.constants import MONITOR_STOP, MONITOR_UPDATE_CONFIG
+from monitoring.constants import (LOG_NOTIFIER, MONITOR_STOP,
+                                  MONITOR_UPDATE_CONFIG, THREAD_NOTIFIER)
+from monitoring.notifications.templates import (ALERT_STARTED_EMAIL,
+                                                ALERT_STARTED_SMS,
+                                                ALERT_STOPPED_EMAIL,
+                                                ALERT_STOPPED_SMS)
 
 # check if running on Raspberry
 if os.uname()[4][:3] == 'arm':
@@ -98,6 +101,10 @@ class Notifier(Thread):
     def run(self):
         self._logger.info("Notifier started...")
 
+        # --------------------------------------------------------------
+        # Workaround to avoid hanging of keypad process on create_engine
+        sleep(5)
+        # --------------------------------------------------------------
         self._db_session = db.create_scoped_session()
         self._options = self.get_options()
         self._logger.info("Subscription configuration: %s", self._options['subscriptions'])

@@ -1,7 +1,7 @@
 import logging
 import os
 import sys
-from queue import Queue
+from multiprocessing import Queue
 from signal import SIGTERM, signal
 from threading import Event, Thread
 from time import sleep
@@ -34,6 +34,7 @@ def initialize_logging():
     logging.getLogger('SocketIOServer').setLevel(logging.INFO)
     logging.getLogger('gsmmodem.modem.GsmModem').setLevel(logging.ERROR)
     logging.getLogger('gsmmodem.serial_comms.SerialComms').setLevel(logging.ERROR)
+    # logging.getLogger('sqlalchemy.engine').setLevel(logging.DEBUG)
 
 
 def createPidFile():

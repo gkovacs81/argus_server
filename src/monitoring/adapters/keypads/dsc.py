@@ -152,9 +152,11 @@ class DSCKeypad(KeypadBase):
         self._logger = logging.getLogger(LOG_ADKEYPAD)
         self._lights = Lights()
         self._line = Line(clock=clock_pin, data=data_pin)
+        self._start_time = None
 
     def initialise(self):
         # initialize connection
+        self._start_time = time()
         self.send_command(self.send_partition_status)
         self.send_command(self.send_zone_status)
         self.send_command(self.send_zone_lights)
@@ -175,12 +177,34 @@ class DSCKeypad(KeypadBase):
 
     def communicate(self):
         self._logger.debug("Start communication DSC...")
+        # send partition status info in every roud
         self.send_command(self.send_partition_status)
 
-        if time() % 240 == 0:
+        # send additional info in every 4th minute
+        if time() - self._start_time > 240:
             self.send_command(self.send_zone_status)
             self.send_command(self.send_zone_lights)
             self.send_command(self.send_datetime)
+            self._start_time = time()
+
+    def send_command_with_retry(self, method, param=None):
+        '''
+        Not use, can be later deleted
+        '''
+        BIT_PERIOD = 0.0015
+        start_time = time()
+        sent_bytes = self.send_command(method, param)
+        safe_communication_time = BIT_PERIOD * 8 * sent_bytes + 0.008
+        period = time() - start_time
+        self._logger.debug("Period: %.3f > %.3f", period, safe_communication_time)
+
+        while period > safe_communication_time:
+            # clear pressed button
+            self.pressed = None
+            self._logger.debug("RETRY: %.3f > %.3f", period, safe_communication_time)
+            start_time = time()
+            sent_bytes = self.send_command(method, param)
+            period = time() - start_time
 
     def send_command(self, method, param=None):
         if param:
@@ -195,12 +219,17 @@ class DSCKeypad(KeypadBase):
             pass
 
         if self._line.conversation[2]["received"] != VOID:
-            self.pressed = f"{Buttons.get_button(self._line.conversation[2]['received'])}"
+            self.pressed = Buttons.get_button(self._line.conversation[2]['received'])
+
+        sent_bytes = len(self._line.conversation) - 1  # remove 9. bit
         self.print_communication()
 
         if do_keybus_query:
             self.send_keybus_query()
+            sent_bytes += len(self._line.conversation) - 1  # remove 9. bit
             self.print_communication()
+
+        return sent_bytes
 
     def send_beep(self, count):
         self._logger.debug("BEEP 0x%0X x %s", self.BEEP, count)
