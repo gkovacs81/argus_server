@@ -21,7 +21,9 @@ class GSM(object):
         self._logger = logging.getLogger(LOG_ADGSM)
 
     def setup(self):
-        section = db.create_scoped_session().query(Option).filter_by(name='notifications', section='gsm').first()
+        db_session = db.create_scoped_session()
+        section = db.session.query(Option).filter_by(name='notifications', section='gsm').first()
+        db_session.close()
         self._options = json.loads(section.value) if section else {'pin_code': ''}
         self._options['port'] = os.environ['GSM_PORT']
         self._options['baud'] = os.environ['GSM_PORT_BAUD']
@@ -62,8 +64,6 @@ class GSM(object):
                     return False
 
     def destroy(self):
-        self._db_session.close()
-
         if self._modem is not None:
             self._modem.close()
 
