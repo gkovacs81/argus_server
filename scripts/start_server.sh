@@ -22,8 +22,10 @@ elif [ "$1" == "prod" ]; then
     --umask 0117 \
     --error-logfile - \
     --capture-output \
-    --log-level=debug \
+    --log-level=INFO \
     --pid $RESOURCE_PATH/argus_server.pid \
     --bind unix:$RESOURCE_PATH/argus_server.sock \
+    --threads=2 \
+    --timeout=400 \
     server:app
 fi
