@@ -14,7 +14,7 @@ if [ "$1" == "dev" ]; then
 elif [ "$1" == "prod" ]; then
   kill -s TERM $(cat $MONITOR_PID_FILE)
   sleep 10s
-  if [ -f $MONITOR_PID_FILE ]; then
+  if kill -s 0 $(cat $MONITOR_PID_FILE); then
     kill -s KILL $(cat $MONITOR_PID_FILE) || true
   fi
 fi
