@@ -9,6 +9,8 @@ except KeyError:
     pass
 from server import db
 
+from sqlalchemy.exc import ProgrammingError
+
 from monitoring.constants import ROLE_ADMIN, ROLE_USER
 
 
@@ -17,8 +19,11 @@ def cleanup():
     meta = db.metadata
     for table in reversed(meta.sorted_tables):
         print(" - Clear table %s" % table)
-        db.session.execute(table.delete())
-        db.session.commit()
+        try:
+            db.session.execute(table.delete())
+            db.session.commit()
+        except ProgrammingError:
+            db.session.rollback()
     print("Database is empty")
 
 
@@ -32,6 +37,11 @@ def env_prod():
         SensorType(4, name='Break', description='Detect glass break')
     ])
     print(" - Created sensor types")
+
+    kt1 = KeypadType(1, 'DSC', 'DSC keybus (DSC PC-1555RKZ)')
+    db.session.add_all([kt1])
+    print(" - Created keypad types")
+
     db.session.commit()
 
 
@@ -69,10 +79,11 @@ def env_dev():
 
     kt1 = KeypadType(1, 'DSC', 'DSC keybus (DSC PC-1555RKZ)')
     db.session.add_all([kt1])
+    print(" - Created keypad types")
 
     k1 = Keypad(keypad_type=kt1)
     db.session.add_all([k1])
-
+    print(" - Created keypads")
 
     db.session.commit()
 
