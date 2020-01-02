@@ -18,7 +18,7 @@ if [ "$1" == "dev" ] || [ "$1" == "demo" ]; then
   # create file with path and set permissions
   install -Dv /dev/null $MONITOR_INPUT_SOCKET
   chown -R $USER:$USER $MONITOR_INPUT_SOCKET
-  PYTHONPATH=src $PYENV/bin/python3 -s -m monitoring
+  PYTHONPATH=src $PYENV/bin/python3 -d -s -m monitoring
 elif [ "$1" == "prod" ]; then
   # update the system clock from RTC
   /sbin/hwclock --hctosys >> /var/log/hwclock.log
