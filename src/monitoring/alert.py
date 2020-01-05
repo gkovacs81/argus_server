@@ -25,9 +25,10 @@ SYREN_DEFAULT_SUSPEND_TIME = 5
 
 
 class SensorAlert(Thread):
-    '''
+    """
     Handling of alerts from sensors and trigger syren alert.
-    '''
+    """
+
     _sensor_queue = Queue()
 
     def __init__(self, sensor_id, delay, alert_type, stop_event):
@@ -42,9 +43,11 @@ class SensorAlert(Thread):
         self._stop_event = stop_event
 
     def run(self):
-        self._logger.info("Alert (%s) started on sensor (id:%s) waiting %s sec before starting syren", self._alert_type, self._sensor_id, self._delay)
+        self._logger.info("Alert (%s) started on sensor (id:%s) waiting %s sec before starting syren",
+                          self._alert_type, self._sensor_id, self._delay)
         if not self._stop_event.wait(self._delay):
-            self._logger.info("Start syren because not disarmed (%s) sensor (id:%s) in %s secs", self._alert_type, self._sensor_id, self._delay)
+            self._logger.info("Start syren because not disarmed (%s) sensor (id:%s) in %s secs",
+                              self._alert_type, self._sensor_id, self._delay)
             SyrenAlert.start_syren(self._alert_type, SensorAlert._sensor_queue, self._stop_event)
             SensorAlert._sensor_queue.put(self._sensor_id)
             if self._alert_type == ALERT_SABOTAGE:
@@ -55,9 +58,9 @@ class SensorAlert(Thread):
 
 
 class SyrenAlert(Thread):
-    '''
+    """
     Handling of syren alerts.
-    '''
+    """
 
     _semaphore = BoundedSemaphore()
     _alert = None
@@ -123,7 +126,9 @@ class SyrenAlert(Thread):
         send_alert_state(self._alert.serialize)
         self._syren.alert(True)
         send_syren_state(True)
-        Notifier.notify_alert_started(self._alert.id, list(map(lambda alert_sensor: alert_sensor.sensor.description, self._alert.sensors)), start_time)
+
+        sensor_descriptions = list(map(lambda alert_sensor: alert_sensor.sensor.description, self._alert.sensors))
+        Notifier.notify_alert_started(self._alert.id, sensor_descriptions, start_time)
 
         self._logger.info("Alert started")
 
@@ -155,7 +160,11 @@ class SyrenAlert(Thread):
                         already_added = True
 
                 if not already_added:
-                    alert_sensor = AlertSensor(channel=sensor.channel, type_id=sensor.type_id, description=sensor.description)
+                    alert_sensor = AlertSensor(
+                        channel=sensor.channel,
+                        type_id=sensor.type_id,
+                        description=sensor.description
+                    )
                     alert_sensor.sensor = sensor
                     self._alert.sensors.append(alert_sensor)
                     sensor_added = True
