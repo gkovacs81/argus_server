@@ -3,15 +3,19 @@
 
 import argparse
 
-try:
-    from models import *
-except KeyError:
-    pass
-from server import db
-
 from sqlalchemy.exc import ProgrammingError
 
 from monitoring.constants import ROLE_ADMIN, ROLE_USER
+
+from models import db, Keypad, KeypadType, Sensor, SensorType, User, Zone
+
+
+SENSOR_TYPES = [
+    SensorType(1, name='Motion', description='Detect motion'),
+    SensorType(2, name='Tamper', description='Detect sabotage'),
+    SensorType(3, name='Open', description='Detect opening'),
+    SensorType(4, name='Break', description='Detect glass break')
+]
 
 
 def cleanup():
@@ -30,12 +34,8 @@ def cleanup():
 def env_prod():
     db.session.add(User(name="Administrator", role=ROLE_ADMIN, access_code="1234"))
     print(" - Created admin user")
-    db.session.add_all([
-        SensorType(1, name='Motion', description='Detect motion'),
-        SensorType(2, name='Tamper', description='Detect sabotage'),
-        SensorType(3, name='Open', description='Detect opening'),
-        SensorType(4, name='Break', description='Detect glass break')
-    ])
+
+    db.session.add_all(SENSOR_TYPES)
     print(" - Created sensor types")
 
     kt1 = KeypadType(1, 'DSC', 'DSC keybus (DSC PC-1555RKZ)')
@@ -45,37 +45,70 @@ def env_prod():
     db.session.commit()
 
 
-def env_dev():
+def env_live_01():
     db.session.add_all([
         User(name="Administrator", role=ROLE_ADMIN, access_code="1234"),
-        User(name="Teszt Elek", role=ROLE_USER, access_code="1111")
+        User(name="Chuck Norris", role=ROLE_USER, access_code="1111")
     ])
+    print(" - Created users")
 
-    for alert in Alert.query.all():
-        alert.sensors = []
+    z1 = Zone(name="No delay", description="Alert with no delay")
+    z2 = Zone(name="Away delayed", away_delay=20, description="Alert delayed when armed AWAY")
+    z3 = Zone(name="Stay delayed", stay_delay=20, description="Alert delayed when armed STAY")
+    z4 = Zone(name="Stay", stay_delay=None, description="No alert when armed STAY")
+    z5 = Zone(name="Away/Stay delayed", away_delay=40, stay_delay=20, description="Alert delayed when armed AWAY/STAY")
+    z6 = Zone(name="Tamper", disarmed_delay=0, away_delay=None, stay_delay=None, description="Sabotage alert")
+    db.session.add_all([z1, z2, z3, z4, z5, z6])
+    print(" - Created zones")
+
+    db.session.add_all(SENSOR_TYPES)
+    print(" - Created sensor types")
+
+    s1 = Sensor(channel=0, sensor_type=SENSOR_TYPES[0], zone=z5, description="Garage")
+    s2 = Sensor(channel=1, sensor_type=SENSOR_TYPES[0], zone=z5, description="Hall")
+    s3 = Sensor(channel=2, sensor_type=SENSOR_TYPES[2], zone=z5, description="Front door")
+    s4 = Sensor(channel=3, sensor_type=SENSOR_TYPES[0], zone=z3, description="Kitchen")
+    s5 = Sensor(channel=4, sensor_type=SENSOR_TYPES[0], zone=z1, description="Living room")
+    s6 = Sensor(channel=5, sensor_type=SENSOR_TYPES[0], zone=z4, description="Children's room")
+    s7 = Sensor(channel=6, sensor_type=SENSOR_TYPES[0], zone=z4, description="Bedroom")
+    s8 = Sensor(channel=7, sensor_type=SENSOR_TYPES[1], zone=z6, description="Tamper")
+    db.session.add_all([s1, s2, s3, s4, s5, s6, s7, s8])
+    print(" - Created sensors")
+
+    kt1 = KeypadType(1, 'DSC', 'DSC keybus (DSC PC-1555RKZ)')
+    db.session.add_all([kt1])
+    print(" - Created keypad types")
+
+    k1 = Keypad(keypad_type=kt1)
+    db.session.add_all([k1])
+    print(" - Created keypads")
+
     db.session.commit()
 
-    z1 = Zone(name="Azonnali", description="Azonnali riasztás")
-    z2 = Zone(name="Távozó késleltetett", away_delay=20, description="Távozáskor/érkezésekor késletetett")
-    z3 = Zone(name="Maradó", description="Maradó élesítés esetén nem riaszt")
-    z4 = Zone(name="Maradó késleltetett", stay_delay=20, description="Maradó élesítés esetén késleltetve riaszt")
-    z5 = Zone(name="Távozó/maradó késleltetett", away_delay=20, stay_delay=20, description="Távozó és maradó élesytés esetén késleltetve riaszt")
+
+def env_test_01():
+    db.session.add_all([
+        User(name="Administrator", role=ROLE_ADMIN, access_code="1234"),
+        User(name="Chuck Norris", role=ROLE_USER, access_code="1111")
+    ])
+    print(" - Created users")
+
+    z1 = Zone(name="No delay", description="Alert with no delay")
+    z2 = Zone(name="Tamper", disarmed_delay=0, away_delay=None, stay_delay=None, description="Sabotage alert")
+    z3 = Zone(name="Away/stay delayed", away_delay=5, stay_delay=5, description="Alert delayed when armed AWAY or STAY")
+    z4 = Zone(name="Stay delayed", stay_delay=5, description="Alert delayed when armed STAY")
+    z5 = Zone(name="Stay", stay_delay=None, description="No alert when armed STAY")
     db.session.add_all([z1, z2, z3, z4, z5])
+    print(" - Created zones")
 
-    st1 = SensorType(1, 'Motion', 'Motion sensor')
-    st2 = SensorType(2, 'Tamper', 'Tamper sensor')
-    st3 = SensorType(3, 'Open', 'Door open sensor')
-    st4 = SensorType(4, 'Break', 'Break sensor')
-    db.session.add_all([st1, st2, st3, st4])
+    db.session.add_all(SENSOR_TYPES)
+    print(" - Created sensor types")
 
-    s1 = Sensor(channel=0, sensor_type=st1, zone=z2, description="Garázs bejárati ajtó feletti mozgésérzékelő")
-    s2 = Sensor(channel=1, sensor_type=st1, zone=z5, description="Előszoba mozgésérzékelő")
-    s3 = Sensor(channel=2, sensor_type=st1, zone=z4, description="Étkező/konyha mozgésérzékelő")
-    s4 = Sensor(channel=3, sensor_type=st1, zone=z1, description="Nappali mozgésérzékelő")
-    s5 = Sensor(channel=4, sensor_type=st1, zone=z3, description="Gyerekszoba mozgésérzékelő")
-    s6 = Sensor(channel=5, sensor_type=st1, zone=z3, description="Hálószoba mozgésérzékelő")
-    s7 = Sensor(channel=6, sensor_type=st4, zone=z1, description="Tamper kör")
-    db.session.add_all([s1, s2, s3, s4, s5, s6, s7])
+    s1 = Sensor(channel=0, sensor_type=SENSOR_TYPES[0], zone=z3, description="Garage")
+    s2 = Sensor(channel=1, sensor_type=SENSOR_TYPES[2], zone=z5, description="Test room")
+    s3 = Sensor(channel=2, sensor_type=SENSOR_TYPES[1], zone=z2, description="Tamper")
+    db.session.add_all([s1, s2, s3])
+    print(" - Created sensors")
 
     kt1 = KeypadType(1, 'DSC', 'DSC keybus (DSC PC-1555RKZ)')
     db.session.add_all([kt1])
@@ -95,9 +128,9 @@ def main():
             environments.append(attribute.replace('env_', ''))
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--create", action='store_true', help="Re-create database content")
+    parser.add_argument("-c", "--create", action='store_true', help="Create database content")
     parser.add_argument("-d", "--delete", action='store_true', help="Delete database content")
-    parser.add_argument(dest="environment", help="/".join(environments), metavar="environment")
+    parser.add_argument("-e", "--environment", required=True, help="/".join(environments), metavar="environment")
     args = parser.parse_args()
 
     if args.delete:
