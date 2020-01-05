@@ -7,8 +7,8 @@ Created on 2017. szept. 13.
 from datetime import datetime
 import logging
 import pytz
-
 from threading import Thread, BoundedSemaphore
+from time import time
 
 from models import db, Alert, AlertSensor, Sensor
 from monitoring.adapters.syren import SyrenAdapter
@@ -20,7 +20,7 @@ from monitoring import storage
 from monitoring.notifications.notifier import Notifier
 
 
-SYREN_DEFAULT_ALERT_TIME = 5
+SYREN_DEFAULT_ALERT_TIME = 10
 SYREN_DEFAULT_SUSPEND_TIME = 5
 
 
@@ -28,8 +28,6 @@ class SensorAlert(Thread):
     '''
     Handling of alerts from sensors and trigger syren alert.
     '''
-
-    _syren_alert = None
     _sensor_queue = Queue()
 
     def __init__(self, sensor_id, delay, alert_type, stop_event):
@@ -91,48 +89,57 @@ class SyrenAlert(Thread):
             self._db_session = db.create_scoped_session()
 
         self.start_alert()
+        start_time = time()
+        sysren_is_on = True
         while not self._stop_event.is_set():
-            self._syren.alert(True)
-            send_syren_state(True)
-            self._logger.info("Syren started")
-            if self._stop_event.wait(SYREN_DEFAULT_ALERT_TIME):
+            if self._stop_event.wait(timeout=1):
                 break
 
-            self.handle_sensors()
-
-            self._syren.alert(False)
-            send_syren_state(False)
-            self._logger.info("Syren suspended")
-            if self._stop_event.wait(SYREN_DEFAULT_SUSPEND_TIME):
-                break
+            now = time()
+            if (now - start_time > SYREN_DEFAULT_ALERT_TIME) and sysren_is_on:
+                start_time = time()
+                sysren_is_on = False
+                self._syren.alert(sysren_is_on)
+                send_syren_state(sysren_is_on)
+                self._logger.info("Syren suspended")
+            elif (now - start_time > SYREN_DEFAULT_SUSPEND_TIME) and not sysren_is_on:
+                start_time = time()
+                sysren_is_on = True
+                self._syren.alert(sysren_is_on)
+                send_syren_state(sysren_is_on)
+                self._logger.info("Syren started")
 
             self.handle_sensors()
 
         self.stop_alert()
         self._db_session.close()
-        self._logger.info("Syren stopped")
 
     def start_alert(self):
         start_time = datetime.now(pytz.timezone("CET"))
         self._alert = Alert(self._alert_type, start_time=start_time, sensors=[])
         self._db_session.add(self._alert)
-        if not self.handle_sensors():
-            self._db_session.commit()
+        self._db_session.commit()
 
         send_alert_state(self._alert.serialize)
+        self._syren.alert(True)
+        send_syren_state(True)
         Notifier.notify_alert_started(self._alert.id, list(map(lambda alert_sensor: alert_sensor.sensor.description, self._alert.sensors)), start_time)
+
+        self._logger.info("Alert started")
 
     def stop_alert(self):
         with SyrenAlert._semaphore:
             SyrenAlert._alert = None
             self.handle_sensors()
-            self._syren.alert(False)
             self._alert.end_time = datetime.now(pytz.timezone("CET"))
             self._db_session.commit()
 
             send_alert_state(None)
+            self._syren.alert(False)
             send_syren_state(None)
             Notifier.notify_alert_stopped(self._alert.id, self._alert.end_time)
+
+        self._logger.info("Alert stopped")
 
     def handle_sensors(self):
         sensor_added = False
@@ -144,7 +151,7 @@ class SyrenAlert(Thread):
                 # check if already added to the alert
                 already_added = False
                 for alert_sensor in self._alert.sensors:
-                    if alert_sensor.sensor.id == sensor_id:
+                    if alert_sensor.sensor.id == sensor.id:
                         already_added = True
 
                 if not already_added:
@@ -160,5 +167,6 @@ class SyrenAlert(Thread):
 
         if sensor_added:
             self._db_session.commit()
+            send_alert_state(self._alert.serialize)
 
         return sensor_added
