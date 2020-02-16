@@ -2,41 +2,41 @@
 Created on 2017. szept. 23.
 
 @author: gkovacs
-"""
+'''
+import eventlet
+eventlet.monkey_patch()
+import eventlet.wsgi
 import logging
 import os
-from urllib.parse import parse_qs
-
-import eventlet
-import jose.exceptions
 import socketio
+
+
+from flask import Flask
+from urllib.parse import parse_qs
 from jose import jwt
+import jose.exceptions
 
 from monitoring.constants import LOG_SOCKETIO
 
-logger = logging.getLogger(LOG_SOCKETIO)
 
-logger.error("Server CORS allowed: %s", os.environ['APPLICATION_URIS'].split(','))
-sio = socketio.Server(async_mode='eventlet',
-                      cors_allowed_origins=os.environ['APPLICATION_URIS'].split(','),
-                      logger=logger,
-                      engineio_logger=logger,
-                      async_handlers=True
-)
-app = socketio.WSGIApp(sio)
+sio = socketio.Server(logger=True, async_mode='eventlet', cors_allowed_origins=os.environ['APPLICATION_URIS'].split(','))
+logger = logging.getLogger(LOG_SOCKETIO)
+logging.getLogger("werkzeug").setLevel(logging.DEBUG)
+
 
 def start_socketio():
-    logger.info("Socket IO starting")
-    eventlet.wsgi.server(eventlet.listen((os.environ['MONITOR_HOST'], int(os.environ['MONITOR_PORT']))), app)
-    logger.info("Socket IO started")
+    app = Flask(__name__)
+    app.wsgi_app = socketio.WSGIApp(sio, app.wsgi_app)
+    eventlet.wsgi.server(eventlet.listen(('', int(os.environ['MONITOR_PORT']))), app)
 
 
 @sio.on("connect")
 def connect(sid, environ):
-    logger.debug('Client info "%s": %s', sid, environ)
+    logger.info("Server CORS allowed: %s", os.environ['APPLICATION_URIS'].split(','))
+    logger.debug("Client: %s", sid)
+    # logger.debug('Client info "%s": %s', sid, environ)
     qs = parse_qs(environ["QUERY_STRING"])
     remote_address = environ["REMOTE_ADDR"]
-    # logger.debug('Client address: %s', remote_address)
     try:
         device_info = jwt.decode(
             qs["token"][0], os.environ.get("SECRET"), algorithms="HS256"
@@ -58,7 +58,6 @@ def connect(sid, environ):
 @sio.on("disconnect")
 def disconnect(sid):
     logger.info('Disconnected %s', sid)
-
 
 def send_alert_state(arm_state):
     send_message("alert_state_change", arm_state)

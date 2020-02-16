@@ -4,29 +4,28 @@ Created on 2017. aug. 28.
 @author: gkovacs
 '''
 
-import logging
 from datetime import datetime
-from os import environ
-from queue import Empty
-from threading import Event, Thread
-from time import sleep
+import logging
 
+from os import environ
+from threading import Thread, Event
+from time import sleep
+from eventlet.queue import Empty
+
+from models import db, Alert, Sensor
 import monitoring.alert
-from models import Alert, Sensor, db
-from monitoring import storage
+
 from monitoring.adapters.power import PowerAdapter
 from monitoring.adapters.sensor import SensorAdapter
-from monitoring.constants import (ALERT_AWAY, ALERT_SABOTAGE, ALERT_STAY,
-                                  ARM_AWAY, ARM_DISARM, ARM_STAY, LOG_MONITOR,
-                                  MONITOR_ARM_AWAY, MONITOR_ARM_STAY,
-                                  MONITOR_DISARM, MONITOR_STOP,
-                                  MONITOR_UPDATE_CONFIG, MONITORING_ARMED,
-                                  MONITORING_INVALID_CONFIG, MONITORING_READY,
-                                  MONITORING_SABOTAGE, MONITORING_STARTUP,
-                                  MONITORING_UPDATING_CONFIG, THREAD_MONITOR)
-from monitoring.socket_io import (send_alert_state, send_arm_state,
-                                  send_sensors_state, send_syren_state,
-                                  send_system_state_change)
+from monitoring.constants import THREAD_MONITOR, LOG_MONITOR, MONITORING_STARTUP,\
+    ARM_DISARM, MONITOR_STOP, MONITOR_ARM_AWAY, ARM_AWAY, MONITORING_ARMED,\
+    MONITOR_ARM_STAY, ARM_STAY, MONITOR_DISARM, MONITORING_READY,\
+    MONITOR_UPDATE_CONFIG, MONITORING_UPDATING_CONFIG, MONITORING_INVALID_CONFIG,\
+    MONITORING_SABOTAGE, ALERT_AWAY, ALERT_STAY, ALERT_SABOTAGE
+from monitoring.socket_io import send_system_state_change, send_sensors_state, \
+    send_arm_state, send_alert_state, send_syren_state
+from monitoring import storage
+
 
 MEASUREMENT_CYCLES = 2
 MEASUREMENT_TIME = 3

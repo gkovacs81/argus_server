@@ -101,48 +101,46 @@ class Notifier(Thread):
     def run(self):
         self._logger.info("Notifier started...")
 
-        try:
-            self._db_session = db.create_scoped_session()
-            self._options = self.get_options()
-            self._logger.info("Subscription configuration: %s", self._options['subscriptions'])
+        # --------------------------------------------------------------
+        # Workaround to avoid hanging of keypad process on create_engine
+        sleep(5)
+        # --------------------------------------------------------------
+        self._db_session = db.create_scoped_session()
+        self._options = self.get_options()
+        self._logger.info("Subscription configuration: %s", self._options['subscriptions'])
 
-            self._gsm.setup()
-            while True:
-                message = None
-                try:
-                    message = Notifier._actions.get(timeout=Notifier.RETRY_WAIT)
-                except Empty:
-                    # self._logger.debug("No message found")
-                    pass
+        self._gsm.setup()
+        while True:
+            message = None
+            try:
+                message = Notifier._actions.get(timeout=Notifier.RETRY_WAIT)
+            except Empty:
+                # self._logger.debug("No message found")
+                pass
 
-                # handle actions or messages
-                if type(message) is str:
-                    if message == MONITOR_STOP:
-                        break
-                    elif message == MONITOR_UPDATE_CONFIG:
-                        self._options = self.get_options()
-                        self._gsm.destroy()
-                        self._gsm = GSM()
-                        self._gsm.setup()
-                elif message is not None:
-                    message['retry'] = 0
-                    self._messages.append(message)
+            # handle actions or messages
+            if type(message) is str:
+                if message == MONITOR_STOP:
+                    break
+                elif message == MONITOR_UPDATE_CONFIG:
+                    self._options = self.get_options()
+                    self._gsm.destroy()
+                    self._gsm = GSM()
+                    self._gsm.setup()
+            elif message is not None:
+                message['retry'] = 0
+                self._messages.append(message)
 
-                # try to send the message but not forever
-                if len(self._messages) > 0:
-                    message = self._messages[0]
-                    if self.send_message(message):
-                        self._messages.pop(0)
-                    else:
-                        message['retry'] += 1
-                        if message['retry'] >= Notifier.MAX_RETRY:
-                            self._logger.debug("Deleted message after max retry (%s): %s",
-                                               Notifier.MAX_RETRY, self._messages.pop(0))
-
-        except KeyboardInterrupt:
-            self._logger.info("Notifier interrupt")
-        except Exception:
-            self._logger.exception("Notifier failed!")
+            # try to send the message but not forever
+            if len(self._messages) > 0:
+                message = self._messages[0]
+                if self.send_message(message):
+                    self._messages.pop(0)
+                else:
+                    message['retry'] += 1
+                    if message['retry'] >= Notifier.MAX_RETRY:
+                        self._logger.debug("Deleted message after max retry (%s): %s",
+                                           Notifier.MAX_RETRY, self._messages.pop(0))
 
         self._db_session.close()
         self._logger.info("Notifier stopped")
