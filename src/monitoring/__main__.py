@@ -1,7 +1,10 @@
+import eventlet
+eventlet.monkey_patch()
+
 import logging
 import os
 import sys
-from multiprocessing import Queue
+from multiprocessing import Process, Queue
 from signal import SIGTERM, signal
 from threading import Event, Thread
 from time import sleep
@@ -91,6 +94,14 @@ def start():
 
     signal(SIGTERM, signal_term_handler)
 
+    # start the socket IO server in the main thread
+    try:
+        p = Thread(target=start_socketio)
+        p.start()
+        # start_socketio()
+    except Exception:
+        logger.exception("Failed to start socketIO!")
+
     '''
     The main thread checks the health of the sub threads and crashes the application if any problem happens.
     If the application stops the service running system has to restart it clearly.
@@ -98,8 +109,9 @@ def start():
     May be later threads can be implemented safe to avoid restarting the application.
     '''
     while True:
+        logger.debug("Watching threads....")
         try:
-            for thread in (monitor, ipc_server, notifier, keypad, socketio_server):
+            for thread in (monitor, ipc_server, notifier, keypad):
                 if not thread.is_alive():
                     logger.error("Thread crashed: %s", thread.name)
                     stop_service()
@@ -107,12 +119,6 @@ def start():
         except KeyboardInterrupt:
             logger.info("Keyboard interruption!!!")
             break
-
-    # start the socket IO server in the main thread
-    try:
-        start_socketio()
-    except AssertionError:
-        pass
 
     logger.info("Stopping main...")
 
