@@ -48,7 +48,7 @@ def env_prod():
 def env_live_01():
     db.session.add_all([
         User(name="Administrator", role=ROLE_ADMIN, access_code="1234"),
-        User(name="Chuck Norris", role=ROLE_USER, access_code="1111")
+        User(name="Chuck.Norris", role=ROLE_USER, access_code="1111")
     ])
     print(" - Created users")
 

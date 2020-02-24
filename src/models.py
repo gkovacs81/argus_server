@@ -244,6 +244,7 @@ class User(BaseModel):
     name = db.Column(db.String(32), nullable=False)
     email = db.Column(db.String(255), nullable=True)
     role = db.Column(db.String(12), nullable=False)
+    registration_code = db.Column(db.String(32), nullable=True)
     access_code = db.Column(db.String, nullable=False)
     fourkey_code = db.Column(db.String, nullable=False)
     comment = db.Column(db.String(256), nullable=True)

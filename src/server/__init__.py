@@ -10,8 +10,9 @@ from click import Option
 from flask import Flask, abort, jsonify, request, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from jose import jwt
+from pydbus import registration
 
-from monitoring.constants import ROLE_USER
+from monitoring.constants import ROLE_ADMIN, ROLE_USER
 from server.ipc import IPCClient
 from server.version import __version__
 from tools.clock import get_timezone, gettime_hw, gettime_ntp
@@ -49,37 +50,32 @@ def root():
     return send_from_directory(argus_application_folder, "index.html")
 
 
-def authenticated(check_permissions=True):
+def authenticated(role=ROLE_ADMIN):
     def _authenticated(request_handler):
         @functools.wraps(request_handler)
         def check_access(*args, **kws):
             auth_header = request.headers.get("Authorization")
             # app.logger.info("Header: %s", auth_header)
-            token = auth_header.split(" ")[1] if auth_header else ""
-            if token:
+            raw_token = auth_header.split(" ")[1] if auth_header else ""
+            if raw_token:
                 # app.logger.info("Token: %s", token)
                 try:
-                    data = jwt.decode(
-                        token, os.environ.get("SECRET"), algorithms="HS256"
-                    )
-                    if (
-                        check_permissions
-                        and "role" in data
-                        and data["role"] == ROLE_USER
-                        and request.method != "GET"
-                    ):
+                    token = jwt.decode(raw_token, os.environ.get("SECRET"), algorithms="HS256")
+                    if (((role == ROLE_USER and token.get("role", "") in (ROLE_USER, ROLE_ADMIN)) or
+                       (role == ROLE_ADMIN and token.get("role", "") == ROLE_ADMIN)) and
+                       int(token.get("timestamp", '0')) < int(dt.utcnow().timestamp()) - 60*15):
                         app.logger.info(
                             "Operation %s not permitted for user='%s/%s' from %s",
                             request,
-                            data["name"],
-                            data["role"],
+                            token["name"],
+                            token["role"],
                             request.remote_addr,
                         )
                         return jsonify({"error": "operation not permitted"}), 403
                     return request_handler(*args, **kws)
                 except jose.exceptions.JWTError:
                     app.logger.info(
-                        "Bad token (%s) from %s", token, request.remote_addr
+                        "Bad token (%s) from %s", raw_token, request.remote_addr
                     )
                     return jsonify({"error": "operation not permitted"}), 403
             else:
@@ -103,25 +99,46 @@ def authenticate():
         else request.headers.get("X-Real-Ip")
     )
     # app.logger.debug("Input from '%s': '%s'", remote_address, request.json)
-    for user in User.query.all():
-        if user.access_code == hash_access_code(request.json["access_code"]):
-            return jsonify(
-                {
-                    "user_token": jwt.encode(
-                        {"name": user.name, "role": user.role},
-                        os.environ.get("SECRET"),
-                        algorithm="HS256",
-                    ),
-                    "device_token": jwt.encode(
-                        {"ip": remote_address},
-                        os.environ.get("SECRET"),
-                        algorithm="HS256",
-                    ),
-                }
-            )
+    hashed_access_code = hash_access_code(request.json["access_code"])
+
+    user = User.query.filter_by(access_code=hashed_access_code).first()
+    if user:
+        return jsonify(
+            {
+                "user_token": jwt.encode(
+                    {"name": user.name, "role": user.role, "timestamp": int(dt.utcnow().timestamp())},
+                    os.environ.get("SECRET"),
+                    algorithm="HS256",
+                ),
+                "device_token": jwt.encode(
+                    {"ip": remote_address},
+                    os.environ.get("SECRET"),
+                    algorithm="HS256",
+                ),
+            }
+        )
 
     return jsonify(False)
 
+@app.route("/api/register_device", methods=["GET", "POST"])
+def register_device():
+    app.logger.debug("Authenticating...")
+    # check user credentials and return fake jwt token if valid
+    remote_address = (
+        request.remote_addr
+        if request.remote_addr != "b''"
+        else request.headers.get("X-Real-Ip")
+    )
+    app.logger.debug("Input from '%s': '%s'", remote_address, request.json)
+    user = User.query.filter_by(name=request.json["name"], registration_code=request.json["registration_code"]).first()
+    if user:
+        user.registration_code = ""
+        db.session.commit()
+        return jsonify({
+            "device_token": jwt.encode({"ip": remote_address}, os.environ.get("SECRET"), algorithm="HS256")
+        })
+
+    return jsonify(False)
 
 @app.route("/api/alerts", methods=["GET"])
 @authenticated()
@@ -316,14 +333,14 @@ def get_arm():
 
 
 @app.route("/api/monitoring/arm", methods=["PUT"])
-@authenticated(check_permissions=False)
+@authenticated(role=ROLE_USER)
 def put_arm():
     ipc_client = IPCClient()
     return jsonify(ipc_client.arm(request.args.get("type")))
 
 
 @app.route("/api/monitoring/disarm", methods=["PUT"])
-@authenticated(check_permissions=False)
+@authenticated(role=ROLE_USER)
 def disarm():
     return jsonify(IPCClient().disarm())
 
