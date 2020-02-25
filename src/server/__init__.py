@@ -74,14 +74,10 @@ def authenticated(role=ROLE_ADMIN):
                         return jsonify({"error": "operation not permitted"}), 403
                     return request_handler(*args, **kws)
                 except jose.exceptions.JWTError:
-                    app.logger.info(
-                        "Bad token (%s) from %s", raw_token, request.remote_addr
-                    )
+                    app.logger.info("Bad token (%s) from %s", raw_token, request.remote_addr)
                     return jsonify({"error": "operation not permitted"}), 403
             else:
-                app.logger.info(
-                    "Request without authentication info from %s", request.remote_addr
-                )
+                app.logger.info("Request without authentication info from %s", request.remote_addr)
                 return jsonify({"error": "operation not permitted"}), 403
 
         return check_access
@@ -100,6 +96,15 @@ def authenticate():
     )
     # app.logger.debug("Input from '%s': '%s'", remote_address, request.json)
     hashed_access_code = hash_access_code(request.json["access_code"])
+
+    try:
+        jwt.decode(request.json["device_token"], os.environ.get("SECRET"), algorithms="HS256")
+    except jose.exceptions.JWTError:
+        app.logger.info("Bad device token (%s) from %s", request.json["device_token"], request.remote_addr)
+        return jsonify({"error": "invalid device token"}), 400
+    except KeyError:
+        app.logger.info("Missing device token from %s", request.remote_addr)
+        return jsonify({"error": "missing device token"}), 400
 
     user = User.query.filter_by(access_code=hashed_access_code).first()
     if user:
@@ -130,13 +135,14 @@ def register_device():
         else request.headers.get("X-Real-Ip")
     )
     app.logger.debug("Input from '%s': '%s'", remote_address, request.json)
-    user = User.query.filter_by(name=request.json["name"], registration_code=request.json["registration_code"]).first()
-    if user:
-        user.registration_code = ""
-        db.session.commit()
-        return jsonify({
-            "device_token": jwt.encode({"ip": remote_address}, os.environ.get("SECRET"), algorithm="HS256")
-        })
+    if request.json["registration_code"]:
+        user = User.query.filter_by(name=request.json["name"], registration_code=request.json["registration_code"]).first()
+        if user:
+            user.registration_code = ""
+            db.session.commit()
+            return jsonify({
+                "device_token": jwt.encode({"ip": remote_address}, os.environ.get("SECRET"), algorithm="HS256")
+            })
 
     return jsonify(False)
 
