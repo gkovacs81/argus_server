@@ -12,7 +12,7 @@ from monitoring.constants import (ARM_AWAY, ARM_STAY, MONITOR_ARM_AWAY,
                                   MONITOR_ARM_STAY, MONITOR_DISARM,
                                   MONITOR_SET_CLOCK, MONITOR_SYNC_CLOCK,
                                   MONITOR_UPDATE_CONFIG, MONITOR_UPDATE_DYNDNS,
-                                  MONITOR_UPDATE_KEYPAD)
+                                  MONITOR_UPDATE_KEYPAD, MONITORING_ERROR)
 
 
 class IPCClient(object):
@@ -24,7 +24,10 @@ class IPCClient(object):
     def __init__(self):
         if not self._socket:
             self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            self._socket.connect(environ['MONITOR_INPUT_SOCKET'])
+            try:
+                self._socket.connect(environ['MONITOR_INPUT_SOCKET'])
+            except ConnectionRefusedError:
+                self._socket = None
 
     def disarm(self):
         return self._send_message({
@@ -81,6 +84,9 @@ class IPCClient(object):
         return self._send_message(message)
 
     def _send_message(self, message):
-        self._socket.send(json.dumps(message).encode())
-        data = self._socket.recv(1024)
-        return json.loads(data.decode())
+        if self._socket:
+            self._socket.send(json.dumps(message).encode())
+            data = self._socket.recv(1024)
+            return json.loads(data.decode())
+        else:
+            return {"state": MONITORING_ERROR}
