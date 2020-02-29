@@ -56,6 +56,13 @@ def authenticated(role=ROLE_ADMIN):
         def check_access(*args, **kws):
             auth_header = request.headers.get("Authorization")
             # app.logger.info("Header: %s", auth_header)
+            remote_address = (
+                request.remote_addr
+                if request.remote_addr != "b''"
+                else request.headers.get("X-Real-Ip")
+            )
+            # app.logger.debug("Input from '%s': '%s'", remote_address, request.json)
+
             raw_token = auth_header.split(" ")[1] if auth_header else ""
             if raw_token:
                 # app.logger.info("Token: %s", token)
@@ -69,7 +76,7 @@ def authenticated(role=ROLE_ADMIN):
                             request,
                             token["name"],
                             token["role"],
-                            request.remote_addr,
+                            remote_address
                         )
                         return jsonify({"error": "operation not permitted"}), 403
                     return request_handler(*args, **kws)
@@ -89,16 +96,9 @@ def authenticated(role=ROLE_ADMIN):
 def authenticate():
     # app.logger.debug("Authenticating...")
     # check user credentials and return fake jwt token if valid
-    remote_address = (
-        request.remote_addr
-        if request.remote_addr != "b''"
-        else request.headers.get("X-Real-Ip")
-    )
-    # app.logger.debug("Input from '%s': '%s'", remote_address, request.json)
-    hashed_access_code = hash_access_code(request.json["access_code"])
 
     try:
-        jwt.decode(request.json["device_token"], os.environ.get("SECRET"), algorithms="HS256")
+        device_token = jwt.decode(request.json["device_token"], os.environ.get("SECRET"), algorithms="HS256")
     except jose.exceptions.JWTError:
         app.logger.info("Bad device token (%s) from %s", request.json["device_token"], request.remote_addr)
         return jsonify({"error": "invalid device token"}), 400
@@ -106,22 +106,16 @@ def authenticate():
         app.logger.info("Missing device token from %s", request.remote_addr)
         return jsonify({"error": "missing device token"}), 400
 
-    user = User.query.filter_by(access_code=hashed_access_code).first()
-    if user:
-        return jsonify(
-            {
-                "user_token": jwt.encode(
-                    {"name": user.name, "role": user.role, "timestamp": int(dt.utcnow().timestamp())},
-                    os.environ.get("SECRET"),
-                    algorithm="HS256",
-                ),
-                "device_token": jwt.encode(
-                    {"ip": remote_address},
-                    os.environ.get("SECRET"),
-                    algorithm="HS256",
-                ),
-            }
-        )
+    user = User.query.get(device_token["user_id"])
+    if user and user.access_code == hash_access_code(request.json["access_code"]):
+        token = {
+            "name": user.name,
+            "role": user.role,
+            "timestamp": int(dt.utcnow().timestamp())
+        }
+        return jsonify({
+                "user_token": jwt.encode(token, os.environ.get("SECRET"), algorithm="HS256"),
+        })
 
     return jsonify(False)
 
@@ -136,15 +130,20 @@ def register_device():
     )
     app.logger.debug("Input from '%s': '%s'", remote_address, request.json)
     if request.json["registration_code"]:
-        user = User.query.filter_by(name=request.json["name"], registration_code=request.json["registration_code"]).first()
+        user = User.query.filter_by(registration_code=request.json["registration_code"]).first()
         if user:
-            user.registration_code = ""
+            user.registration_code = None
             db.session.commit()
+            token = {
+                "ip": remote_address,
+                "user_id": user.id
+            }
             return jsonify({
-                "device_token": jwt.encode({"ip": remote_address}, os.environ.get("SECRET"), algorithm="HS256")
+                "device_token": jwt.encode(token, os.environ.get("SECRET"), algorithm="HS256")
             })
 
     return jsonify(False)
+
 
 @app.route("/api/alerts", methods=["GET"])
 @authenticated()

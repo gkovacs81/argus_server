@@ -4,6 +4,7 @@ import hashlib
 import json
 import locale
 import os
+import uuid
 from copy import deepcopy
 
 from sqlalchemy.orm.mapper import validates
@@ -244,12 +245,13 @@ class User(BaseModel):
     name = db.Column(db.String(32), nullable=False)
     email = db.Column(db.String(255), nullable=True)
     role = db.Column(db.String(12), nullable=False)
-    registration_code = db.Column(db.String(32), nullable=True)
-    access_code = db.Column(db.String, nullable=False)
+    registration_code = db.Column(db.String(32), unique=True, nullable=True)
+    access_code = db.Column(db.String, unique=True, nullable=False)
     fourkey_code = db.Column(db.String, nullable=False)
     comment = db.Column(db.String(256), nullable=True)
 
     def __init__(self, name, role, access_code, fourkey_code=None):
+        self.id = int(str(uuid.uuid1(123).int)[:8])
         self.name = name
         self.email = ""
         self.role = role
