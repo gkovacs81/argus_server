@@ -10,7 +10,6 @@ from click import Option
 from flask import Flask, abort, jsonify, request, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from jose import jwt
-from pydbus import registration
 
 from monitoring.constants import ROLE_ADMIN, ROLE_USER
 from server.ipc import IPCClient
@@ -95,8 +94,11 @@ def authenticated(role=ROLE_ADMIN):
 @app.route("/api/authenticate", methods=["GET", "POST"])
 def authenticate():
     # app.logger.debug("Authenticating...")
-    # check user credentials and return fake jwt token if valid
-
+    remote_address = (
+        request.remote_addr
+        if request.remote_addr != "b''"
+        else request.headers.get("X-Real-Ip")
+    )
     try:
         device_token = jwt.decode(request.json["device_token"], os.environ.get("SECRET"), algorithms="HS256")
     except jose.exceptions.JWTError:
@@ -106,6 +108,9 @@ def authenticate():
         app.logger.info("Missing device token from %s", request.remote_addr)
         return jsonify({"error": "missing device token"}), 400
 
+    if device_token["ip"] != remote_address:
+        app.logger.warn("User access from not the registered IP: %s != %s", device_token["ip"], remote_address)
+
     user = User.query.get(device_token["user_id"])
     if user and user.access_code == hash_code(request.json["access_code"]):
         token = {
@@ -114,7 +119,7 @@ def authenticate():
             "timestamp": int(dt.utcnow().timestamp())
         }
         return jsonify({
-                "user_token": jwt.encode(token, os.environ.get("SECRET"), algorithm="HS256"),
+            "user_token": jwt.encode(token, os.environ.get("SECRET"), algorithm="HS256"),
         })
     elif not user:
         return jsonify({"error": "invalid user id"}), 400
