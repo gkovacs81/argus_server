@@ -7,6 +7,7 @@ import os
 import uuid
 from copy import deepcopy
 
+from pytz import timezone
 from sqlalchemy.orm.mapper import validates
 
 from server import db
@@ -246,6 +247,7 @@ class User(BaseModel):
     email = db.Column(db.String(255), nullable=True)
     role = db.Column(db.String(12), nullable=False)
     registration_code = db.Column(db.String(64), unique=True, nullable=True)
+    registration_expiry = db.Column(db.DateTime(timezone=True))
     access_code = db.Column(db.String, unique=True, nullable=False)
     fourkey_code = db.Column(db.String, nullable=False)
     comment = db.Column(db.String(256), nullable=True)
@@ -274,8 +276,10 @@ class User(BaseModel):
         if not registration_code:
             registration_code = uuid.uuid1().split("-")[-1]
 
-        print(registration_code)
-        return update_record(self, ("registration_code"), {"registration_code": hash_code(registration_code)})
+        return update_record(self, ("registration_code", "registration_expiry"), {
+            "registration_code": hash_code(registration_code),
+            "registration_expiry": datetime.datetime.now() + datetime.timedelta(hours=24)
+        })
 
     @property
     def serialize(self):

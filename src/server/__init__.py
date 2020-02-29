@@ -6,10 +6,10 @@ from datetime import datetime as dt
 from os.path import isfile, join
 
 import jose.exceptions
-from click import Option
+from jose import jwt
+from dateutil.tz import tzlocal
 from flask import Flask, abort, jsonify, request, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
-from jose import jwt
 
 from monitoring.constants import ROLE_ADMIN, ROLE_USER
 from server.ipc import IPCClient
@@ -138,7 +138,11 @@ def register_device():
     app.logger.debug("Input from '%s': '%s'", remote_address, request.json)
     if request.json["registration_code"]:
         user = User.query.filter_by(registration_code=hash_code(request.json["registration_code"])).first()
+
         if user:
+            if user.registration_expiry and dt.now(tzlocal()) > user.registration_expiry:
+                return jsonify({"error": "expired registration"}), 400
+
             user.registration_code = None
             db.session.commit()
             token = {
