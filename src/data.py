@@ -32,7 +32,9 @@ def cleanup():
 
 
 def env_prod():
-    db.session.add(User(name="Administrator", role=ROLE_ADMIN, access_code="1234"))
+    admin_user = User(name="Administrator", role=ROLE_ADMIN, access_code="1234")
+    admin_user.add_registration_code("ABCD1234")
+    db.session.add(admin_user)
     print(" - Created admin user")
 
     db.session.add_all(SENSOR_TYPES)
@@ -87,8 +89,10 @@ def env_live_01():
 
 
 def env_test_01():
+    admin_user = User(name="Administrator", role=ROLE_ADMIN, access_code="1234")
+    admin_user.add_registration_code("123")
     db.session.add_all([
-        User(name="Administrator", role=ROLE_ADMIN, access_code="1234"),
+        admin_user,
         User(name="Chuck Norris", role=ROLE_USER, access_code="1111")
     ])
     print(" - Created users")

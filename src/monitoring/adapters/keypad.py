@@ -8,7 +8,7 @@ from sqlalchemy.engine import create_engine
 from sqlalchemy.orm.session import sessionmaker
 
 import models
-from models import Keypad, User, hash_access_code
+from models import Keypad, User, hash_code
 from monitoring.adapters.keypads.base import KeypadBase
 from monitoring.adapters.mock.keypad import MockKeypad
 from monitoring.constants import (LOG_ADKEYPAD, MONITOR_ARM_AWAY,
@@ -132,7 +132,7 @@ class Keypad(Process):
                     self._logger.debug("Presses: %s", presses)
                 self._keypad.pressed = None
 
-                if hash_access_code(presses) in self._codes:
+                if hash_code(presses) in self._codes:
                     self._logger.debug("Code: %s", presses)
                     self._responses.put(MONITOR_DISARM)
                     self._keypad.set_armed(False)

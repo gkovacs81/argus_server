@@ -107,7 +107,7 @@ def authenticate():
         return jsonify({"error": "missing device token"}), 400
 
     user = User.query.get(device_token["user_id"])
-    if user and user.access_code == hash_access_code(request.json["access_code"]):
+    if user and user.access_code == hash_code(request.json["access_code"]):
         token = {
             "name": user.name,
             "role": user.role,
@@ -130,7 +130,7 @@ def register_device():
     )
     app.logger.debug("Input from '%s': '%s'", remote_address, request.json)
     if request.json["registration_code"]:
-        user = User.query.filter_by(registration_code=request.json["registration_code"]).first()
+        user = User.query.filter_by(registration_code=hash_code(request.json["registration_code"])).first()
         if user:
             user.registration_code = None
             db.session.commit()

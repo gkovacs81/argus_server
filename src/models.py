@@ -12,7 +12,7 @@ from sqlalchemy.orm.mapper import validates
 from server import db
 
 
-def hash_access_code(access_code):
+def hash_code(access_code):
     return hashlib.sha256((access_code + ":" + os.environ.get("SALT")).encode("utf-8")).hexdigest()
 
 
@@ -245,29 +245,37 @@ class User(BaseModel):
     name = db.Column(db.String(32), nullable=False)
     email = db.Column(db.String(255), nullable=True)
     role = db.Column(db.String(12), nullable=False)
-    registration_code = db.Column(db.String(32), unique=True, nullable=True)
+    registration_code = db.Column(db.String(64), unique=True, nullable=True)
     access_code = db.Column(db.String, unique=True, nullable=False)
     fourkey_code = db.Column(db.String, nullable=False)
     comment = db.Column(db.String(256), nullable=True)
 
     def __init__(self, name, role, access_code, fourkey_code=None):
-        self.id = int(str(uuid.uuid1(123).int)[:8])
+        self.id = int(str(uuid.uuid1(1000).int)[:8])
         self.name = name
         self.email = ""
         self.role = role
-        self.access_code = hash_access_code(access_code)
-        self.fourkey_code = hash_access_code(access_code[:4])
+        self.access_code = hash_code(access_code)
+        self.fourkey_code = hash_code(access_code[:4])
 
     def update(self, data):
+        fields = ("name", "email", "role", "comment")
         if "access_code" in data and data["access_code"]:
-            data["access_code"] = hash_access_code(data["access_code"])
+            data["access_code"] = hash_code(data["access_code"])
             if not data["fourkey_code"]:
-                data["fourkey_code"] = hash_access_code(data["access_code"][:4])
+                data["fourkey_code"] = hash_code(data["access_code"][:4])
             else:
-                data["fourkey_code"] = hash_access_code(data["fourkey_code"])
-            return update_record(self, ("name", "role", "access_code", "fourkey_code"), data)
-        else:
-            return update_record(self, ("name", "email", "role", "comment"), data)
+                data["fourkey_code"] = hash_code(data["fourkey_code"])
+            fields += "fourkey_code"
+
+        return update_record(self, fields, data)
+
+    def add_registration_code(self, registration_code=None):
+        if not registration_code:
+            registration_code = uuid.uuid1().split("-")[-1]
+
+        print(registration_code)
+        return update_record(self, ("registration_code"), {"registration_code": hash_code(registration_code)})
 
     @property
     def serialize(self):
