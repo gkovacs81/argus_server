@@ -116,6 +116,8 @@ def authenticate():
         return jsonify({
                 "user_token": jwt.encode(token, os.environ.get("SECRET"), algorithm="HS256"),
         })
+    elif not user:
+        return jsonify({"error": "invalid user id"}), 400
 
     return jsonify(False)
 
