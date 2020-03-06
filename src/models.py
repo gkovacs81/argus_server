@@ -7,7 +7,6 @@ import os
 import uuid
 from copy import deepcopy
 
-from pytz import timezone
 from sqlalchemy.orm.mapper import validates
 
 from server import db
@@ -272,18 +271,33 @@ class User(BaseModel):
 
         return update_record(self, fields, data)
 
-    def add_registration_code(self, registration_code=None):
+    def add_registration_code(self, registration_code=None, expiry=None):
         if not registration_code:
-            registration_code = uuid.uuid1().split("-")[-1]
+            registration_code = str(uuid.uuid4()).upper().split("-")[-1]
 
-        return update_record(self, ("registration_code", "registration_expiry"), {
+        registration_expiry = None
+        if expiry is None:
+            registration_expiry = None
+        else:
+            registration_expiry = datetime.datetime.now() + datetime.timedelta(seconds=expiry)
+
+        if update_record(self, ("registration_code", "registration_expiry"), {
             "registration_code": hash_code(registration_code),
-            "registration_expiry": datetime.datetime.now() + datetime.timedelta(hours=24)
-        })
+            "registration_expiry": registration_expiry
+        }):
+            return registration_code
 
     @property
     def serialize(self):
-        return {"id": self.id, "name": self.name, "email": self.email, "role": self.role, "comment": self.comment}
+        return {
+            "id": self.id,
+            "name": self.name,
+            "email": self.email,
+            "has_registration_code": bool(self.registration_code),
+            "registration_expiry": self.registration_expiry.strftime("%Y-%m-%dT%H:%M:%S") if self.registration_expiry else None,
+            "role": self.role,
+            "comment": self.comment
+        }
 
 
 class Option(BaseModel):

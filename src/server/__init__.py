@@ -212,6 +212,38 @@ def user(user_id):
     return jsonify({"error": "unknonw action"})
 
 
+@app.route("/api/user/<int:user_id>/registration_code", methods=["GET", "DELETE"])
+@authenticated()
+def registration_code(user_id):
+    app.logger.debug("Authenticating...")
+    # check user credentials and return fake jwt token if valid
+    remote_address = (
+        request.remote_addr
+        if request.remote_addr != "b''"
+        else request.headers.get("X-Real-Ip")
+    )
+    app.logger.debug("Input from '%s': '%s'", remote_address, request.json)
+
+    if request.method == "GET":
+        user = User.query.get(user_id)
+        if user:
+            if user.registration_code:
+                return jsonify({"error": "already has registration code"}), 400
+
+            code = user.add_registration_code(expiry=int(request.args.get('expiry', None)))
+            db.session.commit()
+            return jsonify({"code": code})
+    elif request.method == "DELETE":
+        user = User.query.get(user_id)
+        if user:
+            user.registration_code = None
+            user.registration_expiry = None
+            db.session.commit()
+            return jsonify(True)
+
+    return jsonify(False)
+
+
 @app.route("/api/sensors/", methods=["GET", "POST"])
 @authenticated()
 def sensors():
