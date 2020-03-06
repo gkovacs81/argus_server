@@ -1,17 +1,17 @@
+from datetime import datetime as dt
 import functools
 import logging
 import os
-import re
-from datetime import datetime as dt
 from os.path import isfile, join
+import re
 
 import jose.exceptions
-from jose import jwt
-from dateutil.tz import tzlocal
+from dateutil.tz import UTC, tzlocal
 from flask import Flask, abort, jsonify, request, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
+from jose import jwt
 
-from monitoring.constants import ROLE_ADMIN, ROLE_USER
+from monitoring.constants import ROLE_ADMIN, ROLE_USER, TOKEN_EXPIRY
 from server.ipc import IPCClient
 from server.version import __version__
 from tools.clock import get_timezone, gettime_hw, gettime_ntp
@@ -67,9 +67,12 @@ def authenticated(role=ROLE_ADMIN):
                 # app.logger.info("Token: %s", token)
                 try:
                     token = jwt.decode(raw_token, os.environ.get("SECRET"), algorithms="HS256")
-                    if (((role == ROLE_USER and token.get("role", "") in (ROLE_USER, ROLE_ADMIN)) or
-                       (role == ROLE_ADMIN and token.get("role", "") == ROLE_ADMIN)) and
-                       int(token.get("timestamp", '0')) < int(dt.utcnow().timestamp()) - 60*15):
+                    print("Token: ", token["timestamp"])
+                    if int(token["timestamp"]) < int(dt.now(tz=UTC).timestamp()) - TOKEN_EXPIRY:
+                        return jsonify({"error": "token expired"}), 401
+
+                    if (role == ROLE_USER and token["role"] not in (ROLE_USER, ROLE_ADMIN)) or \
+                       (role == ROLE_ADMIN and token["role"] not in (ROLE_ADMIN,)):
                         app.logger.info(
                             "Operation %s not permitted for user='%s/%s' from %s",
                             request,
@@ -116,7 +119,7 @@ def authenticate():
         token = {
             "name": user.name,
             "role": user.role,
-            "timestamp": int(dt.utcnow().timestamp())
+            "timestamp": int(dt.now(tz=UTC).timestamp())
         }
         return jsonify({
             "user_token": jwt.encode(token, os.environ.get("SECRET"), algorithm="HS256"),
@@ -127,7 +130,7 @@ def authenticate():
     return jsonify(False)
 
 
-@app.route("/api/register_device", methods=["GET"])
+@app.route("/api/register_device", methods=["POST"])
 def register_device():
     app.logger.debug("Authenticating...")
     # check user credentials and return fake jwt token if valid

@@ -5,6 +5,10 @@ Created on 2017. dec. 3.
 '''
 from logging import DEBUG, INFO
 
+
+# authentication toket valid for 15 mins
+TOKEN_EXPIRY = 60*15
+
 # Threads and logging
 THREAD_SERVICE  = 'Service'
 THREAD_MONITOR  = 'Monitor'
