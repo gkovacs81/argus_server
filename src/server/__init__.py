@@ -77,14 +77,14 @@ def authenticated(role=ROLE_ADMIN):
                             token["role"],
                             remote_address
                         )
-                        return jsonify({"error": "operation not permitted"}), 403
+                        return jsonify({"error": "operation not permitted (role)"}), 403
                     return request_handler(*args, **kws)
                 except jose.exceptions.JWTError:
                     app.logger.info("Bad token (%s) from %s", raw_token, request.remote_addr)
-                    return jsonify({"error": "operation not permitted"}), 403
+                    return jsonify({"error": "operation not permitted (wrong token)"}), 403
             else:
                 app.logger.info("Request without authentication info from %s", request.remote_addr)
-                return jsonify({"error": "operation not permitted"}), 403
+                return jsonify({"error": "operation not permitted (missing token)"}), 403
 
         return check_access
 
@@ -126,7 +126,8 @@ def authenticate():
 
     return jsonify(False)
 
-@app.route("/api/register_device", methods=["GET", "POST"])
+
+@app.route("/api/register_device", methods=["GET"])
 def register_device():
     app.logger.debug("Authenticating...")
     # check user credentials and return fake jwt token if valid
@@ -179,12 +180,10 @@ def get_alert():
 @authenticated()
 def users():
     if request.method == "GET":
-        return jsonify([i.serialize for i in User.query.all()])
+        return jsonify([i.serialize for i in User.query.order_by(User.role).all()])
     elif request.method == "POST":
         data = request.json
-        user = User(
-            name=data["name"], role=data["role"], access_code=data["access_code"]
-        )
+        user = User(name=data["name"], role=data["role"], access_code=data["access_code"])
         db.session.add(user)
         db.session.commit()
         return jsonify(user.serialize)
