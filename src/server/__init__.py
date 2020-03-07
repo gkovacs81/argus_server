@@ -262,7 +262,8 @@ def registration_code(user_id):
             if user.registration_code:
                 return jsonify({"error": "already has registration code"}), 400
 
-            code = user.add_registration_code(expiry=int(request.args.get('expiry', None)))
+            expiry = int(request.args.get('expiry')) if request.args.get('expiry') else None
+            code = user.add_registration_code(expiry=expiry)
             db.session.commit()
             return jsonify({"code": code})
     elif request.method == "DELETE":
