@@ -49,6 +49,37 @@ def root():
     return send_from_directory(argus_application_folder, "index.html")
 
 
+def registered():
+    def _registered(request_handler):
+        @functools.wraps(request_handler)
+        def check_access(*args, **kws):
+            auth_header = request.headers.get("Authorization")
+            # app.logger.info("Header: %s", auth_header)
+            remote_address = (
+                request.remote_addr
+                if request.remote_addr != "b''"
+                else request.headers.get("X-Real-Ip")
+            )
+            # app.logger.debug("Input from '%s': '%s'", remote_address, request.json)
+
+            raw_token = auth_header.split(" ")[1] if auth_header else ""
+            if raw_token:
+                # app.logger.info("Token: %s", token)
+                try:
+                    token = jwt.decode(raw_token, os.environ.get("SECRET"), algorithms="HS256")
+                    return request_handler(*args, **kws)
+                except jose.exceptions.JWTError:
+                    app.logger.info("Bad token (%s) from %s", raw_token, request.remote_addr)
+                    return jsonify({"error": "operation not permitted (wrong token)"}), 403
+            else:
+                app.logger.info("Request without authentication info from %s", request.remote_addr)
+                return jsonify({"error": "operation not permitted (missing token)"}), 403
+
+        return check_access
+
+    return _registered
+
+
 def authenticated(role=ROLE_ADMIN):
     def _authenticated(request_handler):
         @functools.wraps(request_handler)
@@ -67,7 +98,6 @@ def authenticated(role=ROLE_ADMIN):
                 # app.logger.info("Token: %s", token)
                 try:
                     token = jwt.decode(raw_token, os.environ.get("SECRET"), algorithms="HS256")
-                    print("Token: ", token["timestamp"])
                     if int(token["timestamp"]) < int(dt.now(tz=UTC).timestamp()) - TOKEN_EXPIRY:
                         return jsonify({"error": "token expired"}), 401
 
@@ -168,7 +198,7 @@ def get_alerts():
 
 
 @app.route("/api/alert", methods=["GET"])
-@authenticated()
+@registered()
 def get_alert():
     alert = (
         Alert.query.filter_by(end_time=None).order_by(Alert.start_time.desc()).first()
@@ -324,7 +354,7 @@ def sensortypes():
 
 
 @app.route("/api/sensor/alert", methods=["GET"])
-@authenticated()
+@registered()
 def get_sensor_alert():
     if request.args.get("sensor_id"):
         return jsonify(
@@ -376,7 +406,7 @@ def zone(zone_id):
 
 
 @app.route("/api/monitoring/arm", methods=["GET"])
-@authenticated()
+@registered()
 def get_arm():
     ipc_client = IPCClient()
     return jsonify(ipc_client.get_arm())
@@ -396,7 +426,7 @@ def disarm():
 
 
 @app.route("/api/monitoring/state", methods=["GET"])
-@authenticated()
+@registered()
 def get_state():
     ipc_client = IPCClient()
     return jsonify(ipc_client.get_state())
