@@ -80,6 +80,16 @@ def registered():
     return _registered
 
 
+def generate_user_token(name, role):
+    token = {
+        "name": name,
+        "role": role,
+        "timestamp": int(dt.now(tz=UTC).timestamp())
+    }
+
+    return jwt.encode(token, os.environ.get("SECRET"), algorithm="HS256")
+
+
 def authenticated(role=ROLE_ADMIN):
     def _authenticated(request_handler):
         @functools.wraps(request_handler)
@@ -111,7 +121,9 @@ def authenticated(role=ROLE_ADMIN):
                             remote_address
                         )
                         return jsonify({"error": "operation not permitted (role)"}), 403
-                    return request_handler(*args, **kws)
+                    response = request_handler(*args, **kws)
+                    response.headers["User-Token"] = generate_user_token(token["name"], token["role"])
+                    return response
                 except jose.exceptions.JWTError:
                     app.logger.info("Bad token (%s) from %s", raw_token, request.remote_addr)
                     return jsonify({"error": "operation not permitted (wrong token)"}), 403
@@ -146,13 +158,8 @@ def authenticate():
 
     user = User.query.get(device_token["user_id"])
     if user and user.access_code == hash_code(request.json["access_code"]):
-        token = {
-            "name": user.name,
-            "role": user.role,
-            "timestamp": int(dt.now(tz=UTC).timestamp())
-        }
         return jsonify({
-            "user_token": jwt.encode(token, os.environ.get("SECRET"), algorithm="HS256"),
+            "user_token": generate_user_token(user.name, user.role),
         })
     elif not user:
         return jsonify({"error": "invalid user id"}), 400
