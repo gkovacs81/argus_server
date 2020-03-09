@@ -11,7 +11,7 @@ from flask import Flask, abort, jsonify, request, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from jose import jwt
 
-from monitoring.constants import ROLE_ADMIN, ROLE_USER, TOKEN_EXPIRY
+from monitoring.constants import ROLE_ADMIN, ROLE_USER, USER_TOKEN_EXPIRY
 from server.ipc import IPCClient
 from server.version import __version__
 from tools.clock import get_timezone, gettime_hw, gettime_ntp
@@ -108,7 +108,7 @@ def authenticated(role=ROLE_ADMIN):
                 # app.logger.info("Token: %s", token)
                 try:
                     token = jwt.decode(raw_token, os.environ.get("SECRET"), algorithms="HS256")
-                    if int(token["timestamp"]) < int(dt.now(tz=UTC).timestamp()) - TOKEN_EXPIRY:
+                    if int(token["timestamp"]) < int(dt.now(tz=UTC).timestamp()) - USER_TOKEN_EXPIRY:
                         return jsonify({"error": "token expired"}), 401
 
                     if (role == ROLE_USER and token["role"] not in (ROLE_USER, ROLE_ADMIN)) or \

@@ -6,9 +6,6 @@ Created on 2017. dec. 3.
 from logging import DEBUG, INFO
 
 
-# authentication toket valid for 15 mins
-TOKEN_EXPIRY = 60*15
-
 # Threads and logging
 THREAD_SERVICE  = 'Service'
 THREAD_MONITOR  = 'Monitor'
@@ -57,6 +54,10 @@ MONITOR_SET_CLOCK = 'monitor_set_clock'
 
 '''---------------------------------------------------------------'''
 # CONSTANTS USED ALSO BY THE WEB APPLICATION
+
+# authentication toket valid for 15 mins
+USER_TOKEN_EXPIRY = 60*15
+
 # arm types
 ARM_AWAY = 'arm_away'
 ARM_STAY = 'arm_stay'
