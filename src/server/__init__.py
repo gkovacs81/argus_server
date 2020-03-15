@@ -198,7 +198,7 @@ def register_device():
 
 
 @app.route("/api/alerts", methods=["GET"])
-@authenticated()
+@authenticated(role=ROLE_USER)
 def get_alerts():
     # app.logger.debug("Request: %s", request.args.get('alerting'))
     return jsonify([i.serialize for i in Alert.query.order_by(Alert.start_time.desc())])
@@ -284,36 +284,39 @@ def registration_code(user_id):
     return jsonify(False)
 
 
-@app.route("/api/sensors/", methods=["GET", "POST"])
-@authenticated()
-def sensors():
-    if request.method == "GET":
-        # app.logger.debug("Request: %s", request.args.get('alerting'))
-        if not request.args.get("alerting"):
-            return jsonify(
-                [
-                    i.serialize
-                    for i in Sensor.query.filter_by(deleted=False).order_by(
-                        Sensor.channel.asc()
-                    )
-                ]
-            )
-        return jsonify([i.serialize for i in Sensor.query.filter_by(alert=True).all()])
-    elif request.method == "POST":
-        data = request.json
-        zone = Zone.query.get(request.json["zone_id"])
-        sensor_type = SensorType.query.get(data["type_id"])
-        sensor = Sensor(
-            channel=data["channel"],
-            zone=zone,
-            sensor_type=sensor_type,
-            description=data["description"],
+@app.route("/api/sensors/", methods=["GET"])
+@authenticated(role=ROLE_USER)
+def view_sensors():
+    # app.logger.debug("Request: %s", request.args.get('alerting'))
+    if not request.args.get("alerting"):
+        return jsonify(
+            [
+                i.serialize
+                for i in Sensor.query.filter_by(deleted=False).order_by(
+                    Sensor.channel.asc()
+                )
+            ]
         )
-        db.session.add(sensor)
-        db.session.commit()
-        ipc_client = IPCClient()
-        ipc_client.update_configuration()
-        return jsonify(sensor.serialize)
+    return jsonify([i.serialize for i in Sensor.query.filter_by(alert=True).all()])
+
+
+@app.route("/api/sensors/", methods=["POST"])
+@authenticated()
+def update_sensors():
+    data = request.json
+    zone = Zone.query.get(request.json["zone_id"])
+    sensor_type = SensorType.query.get(data["type_id"])
+    sensor = Sensor(
+        channel=data["channel"],
+        zone=zone,
+        sensor_type=sensor_type,
+        description=data["description"],
+    )
+    db.session.add(sensor)
+    db.session.commit()
+    ipc_client = IPCClient()
+    ipc_client.update_configuration()
+    return jsonify(sensor.serialize)
 
 
 @app.route("/api/sensors/reset-references", methods=["PUT"])
@@ -355,7 +358,7 @@ def sensor(sensor_id):
 
 
 @app.route("/api/sensortypes")
-@authenticated()
+@authenticated(role=ROLE_USER)
 def sensortypes():
     # app.logger.debug("Request: %s", request.args.get('alerting'))
     return jsonify([i.serialize for i in SensorType.query.all()])
@@ -373,23 +376,24 @@ def get_sensor_alert():
         return jsonify(Sensor.query.filter_by(alert=True).first() is not None)
 
 
-@app.route("/api/zones/", methods=["GET", "POST"])
-@authenticated()
-def zones():
-    if request.method == "GET":
-        return jsonify([i.serialize for i in Zone.query.filter_by(deleted=False).all()])
-    elif request.method == "POST":
-        zone = Zone()
-        zone.update(request.json)
-        if not zone.description:
-            zone.description = zone.name
-        db.session.add(zone)
-        db.session.commit()
-        ipc_client = IPCClient()
-        ipc_client.update_configuration()
-        return jsonify(zone.serialize)
+@app.route("/api/zones/", methods=["GET"])
+@authenticated(role=ROLE_USER)
+def view_zones():
+    return jsonify([i.serialize for i in Zone.query.filter_by(deleted=False).all()])
 
-    return jsonify({"error": "unknown action"})
+
+@app.route("/api/zones/", methods=["POST"])
+@authenticated()
+def update_zones():
+    zone = Zone()
+    zone.update(request.json)
+    if not zone.description:
+        zone.description = zone.name
+    db.session.add(zone)
+    db.session.commit()
+    ipc_client = IPCClient()
+    ipc_client.update_configuration()
+    return jsonify(zone.serialize)
 
 
 @app.route("/api/zone/<int:zone_id>", methods=["GET", "PUT", "DELETE"])
