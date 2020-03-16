@@ -232,7 +232,7 @@ class Zone(BaseModel):
 
     @validates("disarmed_delay", "away_delay", "stay_delay")
     def validates_away_delay(self, key, delay):
-        assert delay and delay >= 0 or not delay
+        assert delay and delay >= 0 or not delay, "Delay is positive integer (>= 0)"
         return delay
 
 
@@ -247,7 +247,7 @@ class User(BaseModel):
     role = db.Column(db.String(12), nullable=False)
     registration_code = db.Column(db.String(64), unique=True, nullable=True)
     registration_expiry = db.Column(db.DateTime(timezone=True))
-    access_code = db.Column(db.String, unique=True, nullable=False)
+    access_code = db.Column(db.String, unique=False, nullable=False)
     fourkey_code = db.Column(db.String, nullable=False)
     comment = db.Column(db.String(256), nullable=True)
 
@@ -261,13 +261,18 @@ class User(BaseModel):
 
     def update(self, data):
         fields = ("name", "email", "role", "comment")
-        if "access_code" in data and data["access_code"]:
-            data["access_code"] = hash_code(data["access_code"])
-            if not data["fourkey_code"]:
-                data["fourkey_code"] = hash_code(data["access_code"][:4])
+        access_code = data.get("access_code", '')
+        if data.get("access_code", ''):
+            assert len(access_code) >= 4 and len(access_code) <= 12, "Access code length (>=4, <=12)"
+            assert access_code.isdigit(), "Access code only number"
+            data["access_code"] = hash_code(access_code)
+            if not data.get("fourkey_code", None):
+                data["fourkey_code"] = hash_code(access_code[:4])
             else:
+                assert len(data["fourkey_code"]) == 4, "Fourkey code length (=4)"
+                assert data["fourkey_code"].isdigit(), "Fourkey code only number"
                 data["fourkey_code"] = hash_code(data["fourkey_code"])
-            fields += "fourkey_code"
+            fields += ("access_code", "fourkey_code",)
 
         return update_record(self, fields, data)
 
