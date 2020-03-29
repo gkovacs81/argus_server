@@ -8,23 +8,13 @@ import uuid
 from copy import deepcopy
 
 from sqlalchemy.orm.mapper import validates
+from stringcase import camelcase, snakecase
 
 from server import db
 
 
 def hash_code(access_code):
     return hashlib.sha256((access_code + ":" + os.environ.get("SALT")).encode("utf-8")).hexdigest()
-
-
-def update_record(record, attributes, data):
-    """Update the given attributes of a record (dict) based on a dictionary"""
-    record_changed = False
-    for key, value in data.items():
-        if key in attributes:
-            if value != getattr(record, key, value):
-                setattr(record, key, value)
-                record_changed = True
-    return record_changed
 
 
 def merge_dicts(target, source):
@@ -66,6 +56,14 @@ def filter_keys(data, keys):
             filter_keys(value, keys)
 
 
+def convert2camel(data):
+    """Convert the attribute names of the dictonary to camel case for compatibility with angular"""
+    converted = {}
+    for key, value in data.items():
+        converted[camelcase(key)] = value
+
+    return converted
+
 class BaseModel(db.Model):
     """Base data model for all objects"""
 
@@ -84,6 +82,25 @@ class BaseModel(db.Model):
         """
         return {column: value if not isinstance(value, datetime.date) else value.strftime("%Y-%m-%d") for column, value in self.__dict__.items()}
 
+    def update_record(self, attributes, data):
+        """Update the given attributes of the record (dict) based on a dictionary"""
+        record_changed = False
+        for key, value in data.items():
+            snake_key = snakecase(key)
+            if snake_key in attributes:
+                if value != getattr(self, snake_key, value):
+                    setattr(self, snake_key, value)
+                    record_changed = True
+        return record_changed
+
+    def serialize_attributes(self, attributes):
+        """Create JSON object with given attributes"""
+        result = {}
+        for attribute in attributes:
+            result[attribute] = getattr(self, attribute, None)
+
+        return result
+
 
 class SensorType(BaseModel):
     """Model for sensor type table"""
@@ -101,7 +118,9 @@ class SensorType(BaseModel):
 
     @property
     def serialize(self):
-        return {"id": self.id, "name": self.name, "description": self.description}
+        return convert2camel(
+            self.serialize_attributes(("id", "name", "description"))
+        )
 
 
 class Sensor(BaseModel):
@@ -133,19 +152,13 @@ class Sensor(BaseModel):
         self.deleted = False
 
     def update(self, data):
-        return update_record(self, ("channel", "enabled", "description", "zone_id", "type_id"), data)
+        return self.update_record(("channel", "enabled", "description", "zone_id", "type_id"), data)
 
     @property
     def serialize(self):
-        return {
-            "id": self.id,
-            "channel": self.channel,
-            "alert": self.alert,
-            "description": self.description,
-            "zone_id": self.zone_id,
-            "type_id": self.type_id,
-            "enabled": self.enabled,
-        }
+        return convert2camel(
+            self.serialize_attributes(("id", "channel", "alert", "description", "zone_id", "type_id", "enabled"))
+        )
 
 
 class Alert(BaseModel):
@@ -168,16 +181,13 @@ class Alert(BaseModel):
     @property
     def serialize(self):
         locale.setlocale(locale.LC_ALL, "")
-        return {
+        return convert2camel({
             "id": self.id,
             "alert_type": self.alert_type,
             "start_time": self.start_time.replace(microsecond=0, tzinfo=None).isoformat(sep=" "),
             "end_time": self.end_time.replace(microsecond=0, tzinfo=None).isoformat(sep=" ") if self.end_time else "",
-            "sensors": [
-                {"id": alert_sensor.sensor_id, "channel": alert_sensor.channel, "type_id": alert_sensor.type_id, "description": alert_sensor.description}
-                for alert_sensor in self.sensors
-            ],
-        }
+            "sensors": [alert_sensor.serialize for alert_sensor in self.sensors],
+        })
 
 
 class AlertSensor(BaseModel):
@@ -194,6 +204,12 @@ class AlertSensor(BaseModel):
         self.channel = channel
         self.type_id = type_id
         self.description = description
+
+    @property
+    def serialize(self):
+        return convert2camel(
+            self.serialize_attributes(("id", "channel", "type_id", "description"))
+        )
 
 
 class Zone(BaseModel):
@@ -217,18 +233,13 @@ class Zone(BaseModel):
         self.stay_delay = stay_delay
 
     def update(self, data):
-        return update_record(self, ("name", "description", "disarmed_delay", "away_delay", "stay_delay"), data)
+        return self.update_record(("name", "description", "disarmed_delay", "away_delay", "stay_delay"), data)
 
     @property
     def serialize(self):
-        return {
-            "id": self.id,
-            "name": self.name,
-            "description": self.description,
-            "disarmed_delay": self.disarmed_delay,
-            "away_delay": self.away_delay,
-            "stay_delay": self.stay_delay,
-        }
+        return convert2camel(
+            self.serialize_attributes(("id", "name", "description", "disarmed_delay", "away_delay", "stay_delay"))
+        )
 
     @validates("disarmed_delay", "away_delay", "stay_delay")
     def validates_away_delay(self, key, delay):
@@ -274,7 +285,7 @@ class User(BaseModel):
                 data["fourkey_code"] = hash_code(data["fourkey_code"])
             fields += ("access_code", "fourkey_code",)
 
-        return update_record(self, fields, data)
+        return self.update_record(fields, data)
 
     def add_registration_code(self, registration_code=None, expiry=None):
         if not registration_code:
@@ -286,7 +297,7 @@ class User(BaseModel):
         else:
             registration_expiry = datetime.datetime.now() + datetime.timedelta(seconds=expiry)
 
-        if update_record(self, ("registration_code", "registration_expiry"), {
+        if self.update_record(("registration_code", "registration_expiry"), {
             "registration_code": hash_code(registration_code),
             "registration_expiry": registration_expiry
         }):
@@ -294,15 +305,16 @@ class User(BaseModel):
 
     @property
     def serialize(self):
-        return {
+        return convert2camel({
             "id": self.id,
             "name": self.name,
             "email": self.email,
             "has_registration_code": bool(self.registration_code),
-            "registration_expiry": self.registration_expiry.strftime("%Y-%m-%dT%H:%M:%S") if self.registration_expiry else None,
+            "registration_expiry":
+                self.registration_expiry.strftime("%Y-%m-%dT%H:%M:%S") if self.registration_expiry else None,
             "role": self.role,
             "comment": self.comment
-        }
+        })
 
 
 class Option(BaseModel):
@@ -338,7 +350,11 @@ class Option(BaseModel):
         filtered_value = deepcopy(json.loads(self.value))
         filter_keys(filtered_value, ["smtp_password"])
         filter_keys(filtered_value, ["password"])
-        return {"name": self.name, "section": self.section, "value": json.dumps(filtered_value)}
+        return convert2camel({
+            "name": self.name,
+            "section": self.section,
+            "value": json.dumps(filtered_value)
+        })
 
 
 class Keypad(BaseModel):
@@ -357,11 +373,13 @@ class Keypad(BaseModel):
         self.enabled = enabled
 
     def update(self, data):
-        return update_record(self, ("enabled", "type_id"), data)
+        return self.update_record(("enabled", "type_id"), data)
 
     @property
     def serialize(self):
-        return {"id": self.id, "type_id": self.type_id, "enabled": self.enabled}
+        return convert2camel(
+            self.serialize_attributes(("id", "type_id", "enabled"))
+        )
 
 
 class KeypadType(BaseModel):
@@ -380,4 +398,6 @@ class KeypadType(BaseModel):
 
     @property
     def serialize(self):
-        return {"id": self.id, "name": self.name, "description": self.description}
+        return convert2camel(
+            self.serialize_attributes(("id", "name", "description"))
+        )
