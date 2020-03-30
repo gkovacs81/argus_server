@@ -17,13 +17,17 @@ Before starting the components you need to build the "development" [web applicat
 1. Starting the database:
 
     ```bash
+    # starting the database
     ./scripts/start_database.sh dev
 
-    # prepare the database (only if you start the database container first time)
+    # prepare the database (only if you start a fresh database container)
     # add structure
     ./scripts/update_database_struct.sh dev
     # add example data
     ./scripts/update_database_data.sh dev test_01
+
+    # reset data the database
+    docker stop argus-dev
     ```
 
 2. Starting the server (REST API):
@@ -55,6 +59,10 @@ You can read the logs of the system in the journal.
 ```bash
 journalctl -f -u <argus_server|argus_monitor>
 ```
+
+## Deployment
+
+For deploying the components of ArPI to a Raspberry PI see: https://github.com/ArPIHomeSecurity/arpi_management
 
 ---
 
