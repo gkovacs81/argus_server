@@ -353,7 +353,7 @@ class Option(BaseModel):
         return convert2camel({
             "name": self.name,
             "section": self.section,
-            "value": json.dumps(filtered_value)
+            "value": filtered_value
         })
 
 
