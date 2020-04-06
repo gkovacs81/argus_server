@@ -182,7 +182,7 @@ def register_device():
 
         if user:
             if user.registration_expiry and dt.now(tzlocal()) > user.registration_expiry:
-                return jsonify({"error": "expired registration"}), 400
+                return jsonify({"error": "expired registration code"}), 400
 
             user.registration_code = None
             db.session.commit()
