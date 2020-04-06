@@ -208,7 +208,7 @@ class AlertSensor(BaseModel):
     @property
     def serialize(self):
         return convert2camel(
-            self.serialize_attributes(("id", "channel", "type_id", "description"))
+            self.serialize_attributes(("sensor_id", "channel", "type_id", "description"))
         )
 
 
