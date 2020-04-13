@@ -223,7 +223,7 @@ def users():
         return jsonify([i.serialize for i in User.query.order_by(User.role).all()])
     elif request.method == "POST":
         data = request.json
-        user = User(name=data["name"], role=data["role"], access_code=data["access_code"])
+        user = User(name=data["name"], role=data["role"], access_code=data["accessCode"])
         db.session.add(user)
         db.session.commit()
         return jsonify(user.serialize)
@@ -311,8 +311,8 @@ def view_sensors():
 @authenticated()
 def update_sensors():
     data = request.json
-    zone = Zone.query.get(request.json["zone_id"])
-    sensor_type = SensorType.query.get(data["type_id"])
+    zone = Zone.query.get(request.json["zoneId"])
+    sensor_type = SensorType.query.get(data["typeId"])
     sensor = Sensor(
         channel=data["channel"],
         zone=zone,
@@ -377,9 +377,9 @@ def sensortypes():
 @app.route("/api/sensor/alert", methods=["GET"])
 @registered()
 def get_sensor_alert():
-    if request.args.get("sensor_id"):
+    if request.args.get("sensorId"):
         return jsonify(
-            Sensor.query.filter_by(id=request.args.get("sensor_id"), alert=True).first()
+            Sensor.query.filter_by(id=request.args.get("sensorId"), alert=True).first()
             is not None
         )
     else:
@@ -548,7 +548,7 @@ def keypad(keypad_id):
         try:
             keypad = Keypad.query.get(keypad_id)
             if not keypad:
-                keypad = Keypad(keypad_type=KeypadType.query.get(request.json["type_id"]))
+                keypad = Keypad(keypad_type=KeypadType.query.get(request.json["typeId"]))
             if keypad.update(request.json):
                 db.session.commit()
                 ipc_client = IPCClient()
