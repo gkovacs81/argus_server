@@ -48,7 +48,7 @@ class IPCServer(Thread):
         except OSError:
             pass
 
-        self.createPIDFile()
+        self.create_socket_file()
         self._socket.bind(MONITOR_INPUT_SOCKET)
         self._socket.listen(1)
 
@@ -59,7 +59,7 @@ class IPCServer(Thread):
         except KeyError:
             self._logger.info("No permission or owner defined")
 
-    def createPIDFile(self):
+    def create_socket_file(self):
         filename = MONITOR_INPUT_SOCKET
         if not path.exists(path.dirname(filename)):
             self._logger.info("Create socket file: %s", MONITOR_INPUT_SOCKET)
@@ -108,7 +108,7 @@ class IPCServer(Thread):
         while not self._stop_event.is_set():
             connection = None
             try:
-                connection, self._address = self._socket.accept()
+                connection, _ = self._socket.accept()
             except socket.timeout:
                 pass
 
