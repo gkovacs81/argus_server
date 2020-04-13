@@ -44,6 +44,10 @@ def env_prod():
     db.session.add_all([kt1])
     print(" - Created keypad types")
 
+    k1 = Keypad(keypad_type=kt1)
+    db.session.add_all([k1])
+    print(" - Created keypads")
+
     db.session.commit()
 
 
