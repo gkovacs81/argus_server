@@ -26,6 +26,7 @@ gunicorn = "*"
 noipy = "*"
 pydbus = "*"
 gobject = "*"
+stringcase = "*"
 
 [dev-packages]
 flake8 = "*"
