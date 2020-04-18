@@ -1,6 +1,7 @@
 
 import os
 import os.path
+import re
 
 from datetime import datetime as dt
 from subprocess import check_output, CalledProcessError, run
@@ -28,14 +29,16 @@ def gettime_ntp(addr='0.pool.ntp.org'):
 
 def gettime_hw():
     try:
-        return check_output(["/sbin/hwclock"]).decode().strip()[:19]
+        return re.search(
+            "RTC time: [a-zA-Z]{0,4} ([0-9\-: ]*)",
+            check_output('timedatectl').decode('utf-8')
+        )[1]
     except CalledProcessError:
         pass
 
 
 def get_timezone():
     full_path = os.readlink('/etc/localtime')
-    print(full_path)
     return full_path.replace('/usr/share/zoneinfo/', '')
 
 
