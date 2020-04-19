@@ -11,8 +11,6 @@ def gettime_ntp(addr='0.pool.ntp.org'):
     # http://code.activestate.com/recipes/117211-simple-very-sntp-client/
     import socket
     import struct
-    import sys
-    import time
     try:
         TIME1970 = 2208988800
         client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

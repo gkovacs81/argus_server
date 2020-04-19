@@ -518,12 +518,13 @@ def set_clock():
     return jsonify(True)
 
 
-@app.route("/api/clock/sync", methods=["PUT"])
-def sync_clock():
-    ipc_client = IPCClient()
-    ipc_client.sync_clock()
+# disabled (time-sync service and hwclock cron job is running)
+# @app.route("/api/clock/sync", methods=["PUT"])
+# def sync_clock():
+#     ipc_client = IPCClient()
+#     ipc_client.sync_clock()
 
-    return jsonify(True)
+#     return jsonify(True)
 
 
 @app.route("/api/keypad/<int:keypad_id>", methods=["GET", "PUT", "DELETE"])
