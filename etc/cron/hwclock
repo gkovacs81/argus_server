@@ -1,2 +1,3 @@
-# update hardware clock
-0 2 * * * root /sbin/hwclock --systohc >> /var/log/hwclock.log
+# update hardware clock from system clock
+0 * * * * root /sbin/hwclock --systohc >> /var/log/hwclock.log 2>&1
+@reboot root /sbin/hwclock --hctosys >> /var/log/hwclock.log 2>&1
