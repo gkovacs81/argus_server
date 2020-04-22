@@ -180,7 +180,7 @@ class Alert(BaseModel):
 
     @property
     def serialize(self):
-        locale.setlocale(locale.LC_ALL, "")
+        locale.setlocale(locale.LC_ALL)
         return convert2camel({
             "id": self.id,
             "alert_type": self.alert_type,
