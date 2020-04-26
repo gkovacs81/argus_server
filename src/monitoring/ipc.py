@@ -89,7 +89,7 @@ class IPCServer(Thread):
         elif message["action"] == MONITOR_UPDATE_DYNDNS:
             self._logger.info("Update dyndns...")
             # update configuration
-            update_ip(True)
+            update_ip(force=True)
             update_certificates()
             # enable cron jobs for update configuration periodically
             enable_dyndns_job()

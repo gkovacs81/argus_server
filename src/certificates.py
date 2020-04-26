@@ -32,7 +32,7 @@ def generate_certificate():
             "/home/argus/certbot-auto",
             "certonly",
             "--webroot",
-            "-w",
+            "--webroot-path",
             "/home/argus/server/webapplication",
             "--agree-tos",
             "--email",

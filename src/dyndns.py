@@ -10,7 +10,8 @@ from noipy.main import execute_update
 
 from models import Option
 
-def update_ip(force = False):
+
+def update_ip(force=False):
     '''
     Compare IP address in DNS server and actual lookup result.
     Update the IP address at DNSprovider if it's necesarry.
@@ -21,12 +22,13 @@ def update_ip(force = False):
         noip_config = json.loads(noip_config.value)
     print("Update dynamics DNS provider with options: %s" % noip_config)
 
-    # DNS lookup IP from hostname 
+    # DNS lookup IP from hostname
     try:
         current_ip = socket.gethostbyname(noip_config['hostname'])
     except gaierror:
         return False
 
+    # Getting public IP
     new_ip = requests.get("https://ipconfig.co/ip").text.strip()
     try:
         new_ip = ip_address(new_ip)
@@ -63,7 +65,6 @@ def save_ip(noip_config):
     args.hostname = noip_config['hostname']
     args.ip = noip_config['ip']
     return execute_update(args)
-    #NoipDnsUpdater(auth=authinfo.ApiAuth(noip_config['username'], noip_config['password']), hostname=noip_config['hostname'])
 
 
 if __name__ == '__main__':
