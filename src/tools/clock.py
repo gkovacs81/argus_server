@@ -27,10 +27,12 @@ def gettime_ntp(addr='0.pool.ntp.org'):
 
 def gettime_hw():
     try:
-        return re.search(
+        result = re.search(
             "RTC time: [a-zA-Z]{0,4} ([0-9\\-: ]*)",
             check_output('timedatectl').decode('utf-8')
-        )[1]
+        )
+        if result:
+            return result.group(0)
     except CalledProcessError:
         pass
 
