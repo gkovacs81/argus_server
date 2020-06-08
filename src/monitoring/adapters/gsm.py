@@ -38,16 +38,16 @@ class GSM(object):
         self._modem = GsmModem(self._options['port'], int(self._options['baud']))
         self._modem.smsTextMode = True
 
-        self._logger.info('Connecting to GSM modem on %s with %s baud (PIN: %s)...',
-                          self._options['port'],
-                          self._options['baud'],
-                          self._options['pin_code'])
-
         connected = False
         while not connected:
             try:
-                self._modem.connect(self._options['pin_code'], waitingForModemToStartInSeconds=10)
-                self._logger.debug("GSM modem connected")
+                self._logger.info('Connecting to GSM modem on %s with %s baud (PIN: %s)...',
+                                self._options['port'],
+                                self._options['baud'],
+                                self._options['pin_code'])
+
+                self._modem.connect(self._options['pin_code'])
+                self._logger.info("GSM modem connected")
                 connected = True
             except PinRequiredError:
                 self._logger.error('SIM card PIN required!')
@@ -58,21 +58,21 @@ class GSM(object):
                 self._modem = None
                 return False
             except TimeoutException as error:
-                self._logger.error('No answer from GSM module: %s', error)
-                self._modem = None
-                return False
+                self._logger.error('No answer from GSM module: %s! Request timeout, retry...', str(error))
             except CmeError as error:
-                self._logger.error('No answer from GSM module: %s', str(error))
-                self._modem = None
-                return False
+                self._logger.error('CME error from GSM module: %s! Unexpected error, retry...', str(error))
             except CmsError as error:
                 if str(error) == "CMS 302":
-                    self._logger.debug('GSM modem not ready. Retry...')
-                    sleep(5)
+                    self._logger.debug('GSM modem not ready, retry...')
                 else:
-                    self._logger.error('No answer from GSM module: %s', str(error))
-                    self._modem = None
-                    return False
+                    self._logger.error('CMS error from GSM module: %s. Unexpected error, retry...', str(error))
+            except Exception:
+                self._logger.exception("Failed to access GSM module!")
+                return False
+
+            sleep(5)
+
+        return True
 
     def destroy(self):
         if self._modem is not None:
