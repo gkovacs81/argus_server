@@ -29,7 +29,7 @@ def generate_certificate():
     # non interactive
     subprocess.call(
         [
-            "/home/argus/certbot-auto",
+            "/usr/local/bin/certbot-auto",
             "certonly",
             "--webroot",
             "--webroot-path",
