@@ -36,6 +36,7 @@ def generate_certificate():
             "/home/argus/server/webapplication",
             "--agree-tos",
             "--email",
+            "--cert-name arpi",
             noip_config["username"],
             "-d %s" % noip_config["hostname"],
         ]
@@ -62,7 +63,7 @@ def restart_nginx():
 
 
 def update_certificates():
-    full_certificate = Path("/etc/letsencrypt/live/argus113.ddns.net/fullchain.pem")
+    full_certificate = Path("/etc/letsencrypt/live/arpi/fullchain.pem")
     if not full_certificate.is_file():
         print("No certbot certificate found")
         generate_certificate()
