@@ -55,8 +55,7 @@ def start():
     monitor.start()
 
     notifier_actions = Queue()
-    Notifier._actions = notifier_actions
-    notifier = Notifier()
+    notifier = Notifier(notifier_actions)
     notifier.start()
 
     keypad_actions = Queue()

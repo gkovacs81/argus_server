@@ -28,7 +28,6 @@ Messages
 {
     "type": "alert_started" / "alert_stopped",
     "id": "alert id",
-    "source": "address",
     "sensors": ["Sensor name"],
     "time": "start time",
 }
@@ -76,7 +75,6 @@ class Notifier(Thread):
         cls._actions.put({
             'type': ALERT_STARTED,
             'id': alert_id,
-            'source': "argus113",
             'sensors': sensors,
             'time': time,
         })
@@ -86,13 +84,13 @@ class Notifier(Thread):
         cls._actions.put({
             'type': ALERT_STOPPED,
             'id': alert_id,
-            'source': "argus113",
             'time': time
         })
 
-    def __init__(self):
+    def __init__(self, notifications_queue):
         super(Notifier, self).__init__(name=THREAD_NOTIFIER)
         self._logger = logging.getLogger(LOG_NOTIFIER)
+        self._actions = notifications_queue
         self._gsm = GSM()
         self._messages = []
         self._options = None
