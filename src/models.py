@@ -18,9 +18,9 @@ def hash_code(access_code):
 
 
 def merge_dicts(target, source):
-    if not source:
+    if source is None:
         return
-    if not target:
+    if target is None:
         target = source
         return
 
