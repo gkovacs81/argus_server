@@ -89,8 +89,8 @@ class Notifier(Thread):
 
     def __init__(self, notifications_queue):
         super(Notifier, self).__init__(name=THREAD_NOTIFIER)
+        Notifier._actions = notifications_queue
         self._logger = logging.getLogger(LOG_NOTIFIER)
-        self._actions = notifications_queue
         self._gsm = GSM()
         self._messages = []
         self._options = None
@@ -111,7 +111,7 @@ class Notifier(Thread):
         while True:
             message = None
             try:
-                message = Notifier._actions.get(timeout=Notifier.RETRY_WAIT)
+                message = self._actions.get(timeout=Notifier.RETRY_WAIT)
             except Empty:
                 # self._logger.debug("No message found")
                 pass

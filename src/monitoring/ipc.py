@@ -9,8 +9,8 @@ import socket
 from os import chmod, chown, environ, makedirs, path, remove
 from threading import Thread
 
-from certificates import update_certificates
-from dyndns import update_ip
+from certbot import Certbot
+from dyndns import DynDns
 from monitoring import storage
 from monitoring.constants import (LOG_IPC, MONITOR_ARM_AWAY, MONITOR_ARM_STAY,
                                   MONITOR_DISARM, MONITOR_SET_CLOCK,
@@ -89,8 +89,9 @@ class IPCServer(Thread):
         elif message["action"] == MONITOR_UPDATE_DYNDNS:
             self._logger.info("Update dyndns...")
             # update configuration
-            update_ip(force=True)
-            update_certificates()
+            self._logger.debug("Start letsencrypt...")
+            DynDns().update_ip(force=True)
+            Certbot().update_certificates()
             # enable cron jobs for update configuration periodically
             enable_dyndns_job()
             enable_certbot_job()

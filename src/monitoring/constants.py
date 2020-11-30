@@ -3,7 +3,7 @@ Created on 2017. dec. 3.
 
 @author: gkovacs
 '''
-from logging import DEBUG, INFO
+from logging import DEBUG, INFO, ERROR
 
 
 # Threads and logging
@@ -26,6 +26,8 @@ LOG_ADPOWER   = 'AD.Power'
 LOG_ADSYREN   = 'AD.Syren'
 LOG_ADGSM     = 'AD.GSM'
 LOG_ADKEYPAD  = 'AD.Keypad'
+LOG_CERTBOT   = 'CertBot'
+LOG_DYNDNS    = 'DynDns'
 
 LOGGING_MODULES = [
     (LOG_SERVICE, INFO),
@@ -37,7 +39,9 @@ LOGGING_MODULES = [
     (LOG_ADSENSOR, INFO),
     (LOG_ADSYREN, INFO),
     (LOG_ADGSM, INFO),
-    (LOG_ADKEYPAD, INFO)
+    (LOG_ADKEYPAD, INFO),
+    (LOG_CERTBOT, INFO),
+    (LOG_DYNDNS, INFO)
 ]
 
 # INTERNAL CONSTANTS
