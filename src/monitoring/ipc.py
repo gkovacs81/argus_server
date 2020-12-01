@@ -9,16 +9,14 @@ import socket
 from os import chmod, chown, environ, makedirs, path, remove
 from threading import Thread
 
-from certbot import Certbot
-from dyndns import DynDns
 from monitoring import storage
 from monitoring.constants import (LOG_IPC, MONITOR_ARM_AWAY, MONITOR_ARM_STAY,
                                   MONITOR_DISARM, MONITOR_SET_CLOCK,
                                   MONITOR_SYNC_CLOCK, MONITOR_UPDATE_CONFIG,
-                                  MONITOR_UPDATE_DYNDNS, MONITOR_UPDATE_KEYPAD,
+                                  MONITOR_UPDATE_SECURE_CONNECTION, MONITOR_UPDATE_KEYPAD,
                                   THREAD_IPC)
-from server.tools import enable_certbot_job, enable_dyndns_job
 from tools.clock import set_clock, sync_clock
+from tools.connection import SecureConnection
 
 MONITOR_INPUT_SOCKET = environ["MONITOR_INPUT_SOCKET"]
 
@@ -86,15 +84,9 @@ class IPCServer(Thread):
         elif message["action"] == MONITOR_UPDATE_KEYPAD:
             self._logger.info("Update keypad...")
             self._broadcaster.send_message(MONITOR_UPDATE_KEYPAD)
-        elif message["action"] == MONITOR_UPDATE_DYNDNS:
-            self._logger.info("Update dyndns...")
-            # update configuration
-            self._logger.debug("Start letsencrypt...")
-            DynDns().update_ip(force=True)
-            Certbot().update_certificates()
-            # enable cron jobs for update configuration periodically
-            enable_dyndns_job()
-            enable_certbot_job()
+        elif message["action"] == MONITOR_UPDATE_SECURE_CONNECTION:
+            self._logger.info("Update secure connection...")
+            SecureConnection(self._stop_event).run()
         elif message["action"] == MONITOR_SYNC_CLOCK:
             sync_clock()
         elif message["action"] == MONITOR_SET_CLOCK:

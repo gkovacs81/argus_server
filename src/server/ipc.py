@@ -11,7 +11,7 @@ from os import environ
 from monitoring.constants import (ARM_AWAY, ARM_STAY, MONITOR_ARM_AWAY,
                                   MONITOR_ARM_STAY, MONITOR_DISARM,
                                   MONITOR_SET_CLOCK, MONITOR_SYNC_CLOCK,
-                                  MONITOR_UPDATE_CONFIG, MONITOR_UPDATE_DYNDNS,
+                                  MONITOR_UPDATE_CONFIG, MONITOR_UPDATE_SECURE_CONNECTION,
                                   MONITOR_UPDATE_KEYPAD, MONITORING_ERROR)
 
 
@@ -68,7 +68,7 @@ class IPCClient(object):
 
     def update_dyndns(self):
         return self._send_message({
-            'action': MONITOR_UPDATE_DYNDNS
+            'action': MONITOR_UPDATE_SECURE_CONNECTION
         })
 
     def sync_clock(self):

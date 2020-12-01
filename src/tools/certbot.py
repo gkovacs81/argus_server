@@ -16,13 +16,13 @@ from pydbus import SystemBus
 
 from tools.dictionary import filter_keys
 from models import Option, db
-from monitoring.constants import LOG_CERTBOT
+from monitoring.constants import LOG_SC_CERTBOT
 
 
 class Certbot:
 
     def __init__(self, logger=None):
-        self._logger = logger if logger else logging.getLogger(LOG_CERTBOT)
+        self._logger = logger if logger else logging.getLogger(LOG_SC_CERTBOT)
 
     def generate_certificate(self):
         """
@@ -44,16 +44,17 @@ class Certbot:
             # non interactive
             subprocess.call(
                 [
-                    "/usr/local/bin/certbot-auto",
+                    "/usr/bin/certbot",
                     "certonly",
                     "--webroot",
                     "--webroot-path",
                     "/home/argus/server/webapplication",
                     "--agree-tos",
+                    "--non-interactive",
+                    "--cert-name", "arpi",
                     "--email",
-                    "--cert-name arpi",
                     noip_config["username"],
-                    "-d %s" % noip_config["hostname"],
+                    "-d %s" % noip_config["hostname"]
                 ]
             )
         except FileNotFoundError as error:

@@ -11,14 +11,14 @@ from noipy.main import execute_update
 
 from _socket import gaierror
 from models import Option, db
-from monitoring.constants import LOG_DYNDNS
+from monitoring.constants import LOG_SC_DYNDNS
 from tools.dictionary import filter_keys
 
 
 class DynDns:
 
     def __init__(self, logger=None):
-        self._logger = logger if logger else logging.getLogger(LOG_DYNDNS)
+        self._logger = logger if logger else logging.getLogger(LOG_SC_DYNDNS)
 
     def update_ip(self, force=False):
         '''
@@ -54,14 +54,15 @@ class DynDns:
             self._logger.info("Invalid IP address: %s" % new_ip)
             return False
 
-        self._logger.info("IP: '%s' => '%s'" % (current_ip, new_ip))
 
         if (new_ip != current_ip) or force:
+            self._logger.info("IP: '%s' => '%s'" % (current_ip, new_ip))
             noip_config['ip'] = new_ip
             result = self.save_ip(noip_config)
             self._logger.info("Update result: '%s'" % result)
             return True
         else:
+            self._logger.info("IP: '%s' == '%s'" % (current_ip, new_ip))
             self._logger.info("No IP update necessary")
 
         return True

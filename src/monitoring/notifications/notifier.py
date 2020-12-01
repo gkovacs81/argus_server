@@ -150,7 +150,7 @@ class Notifier(Thread):
                 name='notifications', section=section_name).first()
             options[section_name] = json.loads(
                 section.value) if section else ''
-        self._logger.info("Notifier loaded subscriptions: {}".format(options))
+        self._logger.debug("Notifier loaded subscriptions: {}".format(options))
         return options
 
     def send_message(self, message):

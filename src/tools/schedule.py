@@ -23,7 +23,7 @@ def enable_dyndns_job(enable=True):
         job = argus_cron.new(
             command="systemd-cat -t 'argus_dyndns'  bash -c '. /home/argus/server/pyenv/bin/activate; source /home/argus/server/etc/server.prod.env; source /home/argus/server/etc/secrets.env; python /home/argus/server/src/dyndns.py'",
             comment='Update the IP address at the dynamic DNS provider')
-        job.hours.every()
+        job.hours.every(1)
     job.enable(enable)
     argus_cron.write()
 
@@ -41,6 +41,6 @@ def enable_certbot_job(enable=True):
         job = root_cron.new(
             command="systemd-cat -t 'argus_certbot' bash -c '. /home/argus/server/pyenv/bin/activate; source /home/argus/server/etc/server.prod.env; source /home/argus/server/etc/secrets.env; /home/argus/server/pyenv/bin/python /home/argus/server/src/certbot.py'",
             comment='Generate or update certificate with certbot')
-        job.day.every()
+        job.day.every(1)
     job.enable(enable)
     root_cron.write()
