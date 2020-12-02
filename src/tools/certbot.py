@@ -26,7 +26,7 @@ class Certbot:
 
     def generate_certificate(self):
         """
-        Generate certbot certificates with dynamic dsn provider
+        Generate certbot certificates with dynamic dns provider
         """
         self._logger.info("Generating certbot certificate")
         noip_config = Option.query.filter_by(name="network", section="dyndns").first()
@@ -60,6 +60,25 @@ class Certbot:
         except FileNotFoundError as error:
             self._logger.error("Missing file! %s", error)
 
+    def renew_certificate(self):
+        """
+        Renew certbot certificates
+        """
+        self._logger.info("Renew certbot certificate")
+        try:
+            # non interactive
+            subprocess.call(
+                [
+                    "/usr/bin/certbot",
+                    "renew",
+                    "--non-interactive",
+                    "--quiet",
+                    "--cert-name", "arpi"
+                ]
+            )
+        except FileNotFoundError as error:
+            self._logger.error("Missing file! %s", error)
+
     def swith2certbot(self):
         """
         Changes the symlink for nginx using the certbot certificates instead of the self-signed
@@ -78,8 +97,14 @@ class Certbot:
         systemd.RestartUnit("nginx.service", "fail")
 
     def update_certificates(self):
+        # check if certificate exists
         full_certificate = Path("/etc/letsencrypt/live/arpi/fullchain.pem")
-        if not full_certificate.is_file():
+        if full_certificate.is_file():
+            # if exists renew it
+            self._logger.info("Certbot certificate exists")
+            self.renew_certificate()
+        else:
+            # if not exists generate one
             self._logger.info("No certbot certificate found")
             self.generate_certificate()
 
