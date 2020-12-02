@@ -42,7 +42,7 @@ class Certbot:
 
         try:
             # non interactive
-            subprocess.call(
+            results = subprocess.run(
                 [
                     "/usr/bin/certbot",
                     "certonly",
@@ -51,12 +51,18 @@ class Certbot:
                     "/home/argus/server/webapplication",
                     "--agree-tos",
                     "--non-interactive",
+                    "--quiet",
                     "--cert-name", "arpi",
                     "--email",
                     noip_config["username"],
                     "-d %s" % noip_config["hostname"]
-                ]
+                ],
+                capture_output=True
             )
+            if results.returncode:
+                self._logger.error("Certbot problem: %s", results.stderr.decode("utf-8"))
+            else:
+                self._logger.info("Certificate generated")
         except FileNotFoundError as error:
             self._logger.error("Missing file! %s", error)
 
@@ -67,15 +73,20 @@ class Certbot:
         self._logger.info("Renew certbot certificate")
         try:
             # non interactive
-            subprocess.call(
+            results = subprocess.run(
                 [
                     "/usr/bin/certbot",
                     "renew",
                     "--non-interactive",
                     "--quiet",
                     "--cert-name", "arpi"
-                ]
+                ],
+                capture_output=True
             )
+            if results.returncode:
+                self._logger.error("Certbot problem: %s", results.stderr.decode("utf-8"))
+            else:
+                self._logger.info("Certificate renewed")
         except FileNotFoundError as error:
             self._logger.error("Missing file! %s", error)
 
