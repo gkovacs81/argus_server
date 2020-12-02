@@ -1,1 +1,0 @@
-@daily root /usr/local/bin/certbot-auto renew --text --post-hook "systemctl restart nginx"
