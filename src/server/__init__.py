@@ -136,6 +136,11 @@ def authenticated(role=ROLE_ADMIN):
     return _authenticated
 
 
+@app.errorhandler(AssertionError)
+def handle_validation_errors(error):
+    return jsonify({'error': str(error)}), 400
+
+
 @app.route("/api/authenticate", methods=["GET", "POST"])
 def authenticate():
     # app.logger.debug("Authenticating...")
@@ -178,7 +183,7 @@ def register_device():
     )
     app.logger.debug("Input from '%s': '%s'", remote_address, request.json)
     if request.json["registration_code"]:
-        user = User.query.filter_by(registration_code=hash_code(request.json["registration_code"])).first()
+        user = User.query.filter_by(registration_code=hash_code(request.json["registration_code"].upper())).first()
 
         if user:
             if user.registration_expiry and dt.now(tzlocal()) > user.registration_expiry:
@@ -236,9 +241,9 @@ def user(user_id):
         user = User.query.get(user_id)
         if user:
             return jsonify(user.serialize)
-        abort(404)
+
+        abort(404, 'User not found')
     elif request.method == "PUT":
-        try:
             user = User.query.get(user_id)
             if user:
                 if user.update(request.json):
@@ -247,8 +252,6 @@ def user(user_id):
                 return jsonify(True)
 
             abort(404, 'User not found')
-        except AssertionError as error:
-            abort(400, error)
     elif request.method == "DELETE":
         user = User.query.get(user_id)
         db.session.delete(user)
@@ -354,15 +357,12 @@ def sensor(sensor_id):
         ipc_client.update_configuration()
         return jsonify(True)
     elif request.method == "PUT":
-        try:
             sensor = Sensor.query.get(sensor_id)
             if sensor.update(request.json):
                 db.session.commit()
                 ipc_client = IPCClient()
                 ipc_client.update_configuration()
             return jsonify(True)
-        except AssertionError as error:
-            abort(400, error)
 
     return jsonify({"error": "unknonw action"})
 
@@ -419,15 +419,12 @@ def zone(zone_id):
         ipc_client.update_configuration()
         return jsonify(True)
     elif request.method == "PUT":
-        try:
             zone = Zone.query.get(zone_id)
             if zone.update(request.json):
                 ipc_client = IPCClient()
                 ipc_client.update_configuration()
             db.session.commit()
             return jsonify(zone.serialize)
-        except AssertionError as error:
-            abort(400, error)
 
 
 @app.route("/api/monitoring/arm", methods=["GET"])
@@ -464,7 +461,6 @@ def option(option, section):
         db_option = Option.query.filter_by(name=option, section=section).first()
         return jsonify(db_option.serialize) if db_option else jsonify(None)
     elif request.method == "PUT":
-        try:
             db_option = Option.query.filter_by(name=option, section=section).first()
             if db_option is None:
                 db_option = Option(name=option, section=section, value="")
@@ -483,8 +479,6 @@ def option(option, section):
                     ipc_client.update_dyndns()
 
             return jsonify(True)
-        except AssertionError as error:
-            abort(400, error)
 
 
 @app.route("/api/version", methods=["GET"])
@@ -546,7 +540,6 @@ def keypad(keypad_id):
         ipc_client.update_keypad()
         return jsonify(True)
     elif request.method == "PUT":
-        try:
             keypad = Keypad.query.get(keypad_id)
             if not keypad:
                 keypad = Keypad(keypad_type=KeypadType.query.get(request.json["typeId"]))
@@ -555,8 +548,6 @@ def keypad(keypad_id):
                 ipc_client = IPCClient()
                 ipc_client.update_keypad()
             return jsonify(True)
-        except AssertionError as error:
-            abort(400, error)
 
     return jsonify({"error": "unknonw action"})
 

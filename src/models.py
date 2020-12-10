@@ -5,6 +5,7 @@ import locale
 import os
 import uuid
 from copy import deepcopy
+from re import search
 
 from tools.dictionary import merge_dicts, filter_keys
 from sqlalchemy.orm.mapper import validates
@@ -69,8 +70,10 @@ class SensorType(BaseModel):
 
     __tablename__ = "sensor_type"
 
+    NAME_LENGTH = 16
+
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(16))
+    name = db.Column(db.String(NAME_LENGTH))
     description = db.Column(db.String)
 
     def __init__(self, id, name, description):
@@ -83,6 +86,11 @@ class SensorType(BaseModel):
         return convert2camel(
             self.serialize_attributes(("id", "name", "description"))
         )
+
+    @validates("name")
+    def validates_name(self, key, name):
+        assert 0 <= len(name) <= SensorType.NAME_LENGTH, f"Incorrect name field length ({len(name)})"
+        return name
 
 
 class Sensor(BaseModel):
@@ -121,6 +129,16 @@ class Sensor(BaseModel):
         return convert2camel(
             self.serialize_attributes(("id", "channel", "alert", "description", "zone_id", "type_id", "enabled"))
         )
+
+    @validates("name")
+    def validates_name(self, key, name):
+        assert 0 <= len(name) <= SensorType.NAME_LENGTH, f"Incorrect name field length ({len(name)})"
+        return name
+
+    @validates("channel")
+    def validates_channel(self, key, channel):
+        assert 0 <= channel <= int(os.environ["INPUT_NUMBER"]), f"Incorrect channel (0..{os.environ['INPUT_NUMBER']})"
+        return channel
 
 
 class Alert(BaseModel):
@@ -179,9 +197,11 @@ class Zone(BaseModel):
 
     __tablename__ = "zone"
 
+    NAME_LENGTH = 32
+
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(32), nullable=False)
-    description = db.Column(db.String(128), nullable=False)
+    name = db.Column(db.String(NAME_LENGTH), nullable=False)
+    description = db.Column(db.String, nullable=False)
     disarmed_delay = db.Column(db.Integer, default=None, nullable=True)
     away_delay = db.Column(db.Integer, default=None, nullable=True)
     stay_delay = db.Column(db.Integer, default=None, nullable=True)
@@ -208,21 +228,30 @@ class Zone(BaseModel):
         assert delay and delay >= 0 or not delay, "Delay is positive integer (>= 0)"
         return delay
 
+    @validates("name")
+    def validates_name(self, key, name):
+        assert 0 <= len(name) <= Zone.NAME_LENGTH, f"Incorrect name field length ({len(name)})"
+        return name
+
 
 class User(BaseModel):
     """Model for role table"""
 
     __tablename__ = "user"
 
+    NAME_LENGTH = 32
+    EMAIL_LENGTH = 255
+    REGISTRATION_CODE_LENGTH = 64
+
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(32), nullable=False)
-    email = db.Column(db.String(255), nullable=True)
+    name = db.Column(db.String(NAME_LENGTH), nullable=False)
+    email = db.Column(db.String(EMAIL_LENGTH), nullable=True)
     role = db.Column(db.String(12), nullable=False)
-    registration_code = db.Column(db.String(64), unique=True, nullable=True)
+    registration_code = db.Column(db.String(REGISTRATION_CODE_LENGTH), unique=True, nullable=True)
     registration_expiry = db.Column(db.DateTime(timezone=True))
     access_code = db.Column(db.String, unique=False, nullable=False)
-    fourkey_code = db.Column(db.String, nullable=False)
-    comment = db.Column(db.String(256), nullable=True)
+    fourkey_code = db.Column(db.String(4), nullable=False)
+    comment = db.Column(db.String, nullable=True)
 
     def __init__(self, name, role, access_code, fourkey_code=None):
         self.id = int(str(uuid.uuid1(1000).int)[:8])
@@ -278,15 +307,29 @@ class User(BaseModel):
             "comment": self.comment
         })
 
+    @validates("name")
+    def validates_name(self, key, name):
+        assert 0 <= len(name) <= User.NAME_LENGTH, f"Incorrect name field length ({len(name)})"
+        return name
+
+    @validates("email")
+    def validates_email(self, key, email):
+        assert 0 <= len(email) <= User.EMAIL_LENGTH, f"Incorrect name field length ({len(email)})"
+        email_format = '^[a-z0-9]+[\._]?[a-z0-9]+[@]\w+[.]\w{2,3}$'
+        assert search(email_format, email), "Invalid email format"
+        return email
+
 
 class Option(BaseModel):
     """Model for option table"""
 
     __tablename__ = "option"
 
+    OPTION_LENGTH = 32
+
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(32), nullable=False)
-    section = db.Column(db.String(32), nullable=False)
+    name = db.Column(db.String(OPTION_LENGTH), nullable=False)
+    section = db.Column(db.String(OPTION_LENGTH), nullable=False)
     value = db.Column(db.String)
 
     def __init__(self, name, section, value):
@@ -317,6 +360,18 @@ class Option(BaseModel):
             "section": self.section,
             "value": filtered_value
         })
+
+    @validates("name", "section")
+    def validates_name(self, key, option):
+        assert 0 < len(option) <= Option.OPTION_LENGTH, f"Incorrect name field length ({len(option)})"
+        if key == "name":
+            assert option in ("notifications", "network"), f"Unknown option ({option})"
+        if key == "section":
+            if self.option == "notification":
+                assert option in ("email", "gsm", "subscriptions"), f"Unknown section ({option})"
+            elif self.option == "network":
+                assert option in ("dyndns", "access"), f"Unknown section ({option})"
+        return option
 
 
 class Keypad(BaseModel):
