@@ -367,9 +367,9 @@ class Option(BaseModel):
         if key == "name":
             assert option in ("notifications", "network"), f"Unknown option ({option})"
         if key == "section":
-            if self.option == "notification":
+            if option == "notification":
                 assert option in ("email", "gsm", "subscriptions"), f"Unknown section ({option})"
-            elif self.option == "network":
+            elif option == "network":
                 assert option in ("dyndns", "access"), f"Unknown section ({option})"
         return option
 

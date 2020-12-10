@@ -1,68 +1,79 @@
 
+import logging
 import os
 import os.path
 import re
-
 from datetime import datetime as dt
-from subprocess import check_output, CalledProcessError, run
+from subprocess import CalledProcessError, check_output, run
+
+from monitoring.constants import LOG_CLOCK
 
 
-def gettime_ntp(addr='0.pool.ntp.org'):
-    # http://code.activestate.com/recipes/117211-simple-very-sntp-client/
-    import socket
-    import struct
-    try:
-        TIME1970 = 2208988800
-        client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        data = ('\x1b' + 47 * '\0').encode('utf-8')
-        client.sendto(data, (addr, 123))
-        data, address = client.recvfrom(1024)
-        if data:
-            t = struct.unpack('!12I', data)[10]
-            t -= TIME1970
-            return dt.fromtimestamp(t).isoformat(sep=' ')
-    except socket.gaierror:
-        pass
+class Clock:
 
+    def __init__(self, logger=None):
+        self._logger = logger if logger else logging.getLogger(LOG_CLOCK)
 
-def gettime_hw():
-    try:
-        result = re.search(
-            "RTC time: [a-zA-Z]{0,4} ([0-9\\-: ]*)",
-            check_output('timedatectl').decode('utf-8')
-        )
-        if result:
-            return result.group(0)
-    except CalledProcessError:
-        pass
+    def gettime_ntp(self, addr='0.pool.ntp.org'):
+        # http://code.activestate.com/recipes/117211-simple-very-sntp-client/
+        import socket
+        import struct
+        try:
+            TIME1970 = 2208988800
+            client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            data = ('\x1b' + 47 * '\0').encode('utf-8')
+            client.sendto(data, (addr, 123))
+            data, address = client.recvfrom(1024)
+            if data:
+                t = struct.unpack('!12I', data)[10]
+                t -= TIME1970
+                return dt.fromtimestamp(t).isoformat(sep=' ')
+        except socket.gaierror:
+            pass
 
+    def gettime_hw(self):
+        try:
+            result = re.search(
+                "RTC time: [a-zA-Z]{0,4} ([0-9\\-: ]*)",
+                check_output('timedatectl').decode('utf-8')
+            )
+            if result:
+                return result.group(1)
+        except CalledProcessError:
+            pass
 
-def get_timezone():
-    full_path = os.readlink('/etc/localtime')
-    return full_path.replace('/usr/share/zoneinfo/', '')
+    def get_timezone(self):
+        full_path = os.readlink('/etc/localtime')
+        return full_path.replace('/usr/share/zoneinfo/', '')
 
+    def sync_clock(self):
+        network = self.gettime_ntp()
 
-def sync_clock():
-    network = gettime_ntp()
+        if network is not None:
+            self._logger.info("Network time: {} => writing to hw clock".format(network))
+            run(["date", "--set={}".format(network)])
+            run(['/sbin/hwclock', '-w', '--verbose'])
+        else:
+            hw = self.gettime_hw()
+            if hw:
+                self._logger.info("HW clock time: {} => wrinting to system clock".format(hw))
+                run(["date", "--set={}".format(hw)])
 
-    if network is not None:
-        # print("Network: {}".format(network))
-        run(["date", "--set={}".format(network)])
-        run(['/sbin/hwclock', '-w'])
-    else:
-        hw = gettime_hw()
-        # print("HW: {}".format(hw))
-        if hw is not None:
-            run(["date", "--set={}".format(hw)])
+    def set_clock(self, settings):
+        try:
+            if 'timezone' in settings and os.path.isfile('/usr/share/zoneinfo/' + settings['timezone']):
+                os.remove('/etc/localtime')
+                os.symlink('/usr/share/zoneinfo/' + settings['timezone'], '/etc/localtime')
+            if 'datetime' in settings and settings['datetime']:
+                run(["date", "--set={}".format(settings['datetime'])])
+        except PermissionError:
+            self._logger.error("Permission denied when changing date/time and zone")
+            return False
 
-
-def set_clock(settings):
-    if 'timezone' in settings and os.path.isfile('/usr/share/zoneinfo/' + settings['timezone']):
-        os.remove('/etc/localtime')
-        os.symlink('/usr/share/zoneinfo/' + settings['timezone'], '/etc/localtime')
-    if 'datetime' in settings and settings['datetime']:
-        run(["date", "--set={}".format(settings['datetime'])])
+        return True
 
 
 if __name__ == '__main__':
-    exit(sync_clock())
+    logging.basicConfig(format='%(asctime)-15s %(message)s', level=logging.INFO)
+
+    Clock(logging.getLogger("argus_clock")).sync_clock()

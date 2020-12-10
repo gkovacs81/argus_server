@@ -15,7 +15,7 @@ from monitoring.constants import (LOG_IPC, MONITOR_ARM_AWAY, MONITOR_ARM_STAY,
                                   MONITOR_SYNC_CLOCK, MONITOR_UPDATE_CONFIG,
                                   MONITOR_UPDATE_SECURE_CONNECTION, MONITOR_UPDATE_KEYPAD,
                                   THREAD_IPC)
-from tools.clock import set_clock, sync_clock
+from tools.clock import Clock
 from tools.connection import SecureConnection
 
 MONITOR_INPUT_SOCKET = environ["MONITOR_INPUT_SOCKET"]
@@ -64,6 +64,8 @@ class IPCServer(Thread):
             makedirs(path.dirname(filename))
 
     def handle_actions(self, message):
+        result = True
+        response = ""
         if message["action"] == MONITOR_ARM_AWAY:
             self._logger.info("Action: arm AWAY")
             self._broadcaster.send_message(MONITOR_ARM_AWAY)
@@ -88,12 +90,18 @@ class IPCServer(Thread):
             self._logger.info("Update secure connection...")
             SecureConnection(self._stop_event).run()
         elif message["action"] == MONITOR_SYNC_CLOCK:
-            sync_clock()
+            Clock().sync_clock()
         elif message["action"] == MONITOR_SET_CLOCK:
-            del message["action"]
-            set_clock(message)
+            if not Clock().set_clock(message):
+                result = False
+                response = "Failed to update date/time and zone"
 
-        return {"result": True}
+        return_value = {"result": result}
+
+        if message:
+            return_value["message"] = response
+
+        return return_value
 
     def run(self):
         self._logger.info("IPC server started")

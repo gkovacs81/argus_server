@@ -14,7 +14,7 @@ from jose import jwt
 from monitoring.constants import ROLE_ADMIN, ROLE_USER, USER_TOKEN_EXPIRY
 from server.ipc import IPCClient
 from server.version import __version__
-from tools.clock import get_timezone, gettime_hw, gettime_ntp
+from tools.clock import Clock
 
 argus_application_folder = os.path.join(
     os.getcwd(), os.environ.get("SERVER_STATIC_FOLDER", "")
@@ -244,14 +244,14 @@ def user(user_id):
 
         abort(404, 'User not found')
     elif request.method == "PUT":
-            user = User.query.get(user_id)
-            if user:
-                if user.update(request.json):
-                    db.session.commit()
+        user = User.query.get(user_id)
+        if user:
+            if user.update(request.json):
+                db.session.commit()
 
-                return jsonify(True)
+            return jsonify(True)
 
-            abort(404, 'User not found')
+        abort(404, 'User not found')
     elif request.method == "DELETE":
         user = User.query.get(user_id)
         db.session.delete(user)
@@ -357,12 +357,12 @@ def sensor(sensor_id):
         ipc_client.update_configuration()
         return jsonify(True)
     elif request.method == "PUT":
-            sensor = Sensor.query.get(sensor_id)
-            if sensor.update(request.json):
-                db.session.commit()
-                ipc_client = IPCClient()
-                ipc_client.update_configuration()
-            return jsonify(True)
+        sensor = Sensor.query.get(sensor_id)
+        if sensor.update(request.json):
+            db.session.commit()
+            ipc_client = IPCClient()
+            ipc_client.update_configuration()
+        return jsonify(True)
 
     return jsonify({"error": "unknonw action"})
 
@@ -419,12 +419,12 @@ def zone(zone_id):
         ipc_client.update_configuration()
         return jsonify(True)
     elif request.method == "PUT":
-            zone = Zone.query.get(zone_id)
-            if zone.update(request.json):
-                ipc_client = IPCClient()
-                ipc_client.update_configuration()
-            db.session.commit()
-            return jsonify(zone.serialize)
+        zone = Zone.query.get(zone_id)
+        if zone.update(request.json):
+            ipc_client = IPCClient()
+            ipc_client.update_configuration()
+        db.session.commit()
+        return jsonify(zone.serialize)
 
 
 @app.route("/api/monitoring/arm", methods=["GET"])
@@ -461,24 +461,24 @@ def option(option, section):
         db_option = Option.query.filter_by(name=option, section=section).first()
         return jsonify(db_option.serialize) if db_option else jsonify(None)
     elif request.method == "PUT":
-            db_option = Option.query.filter_by(name=option, section=section).first()
-            if db_option is None:
-                db_option = Option(name=option, section=section, value="")
-                db.session.add(db_option)
+        db_option = Option.query.filter_by(name=option, section=section).first()
+        if db_option is None:
+            db_option = Option(name=option, section=section, value="")
+            db.session.add(db_option)
 
-            changed = db_option.update_value(request.json)
-            db.session.commit()
+        changed = db_option.update_value(request.json)
+        db.session.commit()
 
-            if option == "notifications":
-                if changed:
-                    ipc_client = IPCClient()
-                    ipc_client.update_configuration()
-            elif db_option.name == "network" and db_option.section == "dyndns":
-                if os.environ.get("ARGUS_DEVELOPMENT", "0") == "0":
-                    ipc_client = IPCClient()
-                    ipc_client.update_dyndns()
+        if option == "notifications":
+            if changed:
+                ipc_client = IPCClient()
+                ipc_client.update_configuration()
+        elif db_option.name == "network" and db_option.section == "dyndns":
+            if os.environ.get("ARGUS_DEVELOPMENT", "0") == "0":
+                ipc_client = IPCClient()
+                ipc_client.update_dyndns()
 
-            return jsonify(True)
+        return jsonify(True)
 
 
 @app.route("/api/version", methods=["GET"])
@@ -489,13 +489,14 @@ def version():
 @app.route("/api/clock", methods=["GET"])
 @authenticated()
 def get_clock():
+    clock = Clock()
     result = {
-        "system": dt.now().isoformat(sep=" ")[:19],
-        "hw": gettime_hw(),
-        "timezone": get_timezone(),
+        "system": dt.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "hw": clock.gettime_hw(),
+        "timezone": clock.get_timezone(),
     }
 
-    network = gettime_ntp()
+    network = clock.gettime_ntp()
     if network:
         result["network"] = network
     else:
@@ -507,9 +508,11 @@ def get_clock():
 @app.route("/api/clock", methods=["PUT"])
 def set_clock():
     ipc_client = IPCClient()
-    ipc_client.set_clock(request.json)
-
-    return jsonify(True)
+    return_value = ipc_client.set_clock(request.json)
+    if return_value["result"]:
+        return jsonify(return_value)
+    else:
+        return jsonify(return_value), 500
 
 
 # disabled (time-sync service and hwclock cron job is running)
@@ -540,14 +543,14 @@ def keypad(keypad_id):
         ipc_client.update_keypad()
         return jsonify(True)
     elif request.method == "PUT":
-            keypad = Keypad.query.get(keypad_id)
-            if not keypad:
-                keypad = Keypad(keypad_type=KeypadType.query.get(request.json["typeId"]))
-            if keypad.update(request.json):
-                db.session.commit()
-                ipc_client = IPCClient()
-                ipc_client.update_keypad()
-            return jsonify(True)
+        keypad = Keypad.query.get(keypad_id)
+        if not keypad:
+            keypad = Keypad(keypad_type=KeypadType.query.get(request.json["typeId"]))
+        if keypad.update(request.json):
+            db.session.commit()
+            ipc_client = IPCClient()
+            ipc_client.update_keypad()
+        return jsonify(True)
 
     return jsonify({"error": "unknonw action"})
 
