@@ -122,12 +122,14 @@ class SyrenAlert(Thread):
         self._alert = Alert(self._alert_type, start_time=start_time, sensors=[])
         self._db_session.add(self._alert)
         self._db_session.commit()
+        self.handle_sensors()
 
         send_alert_state(self._alert.serialize)
         self._syren.alert(True)
         send_syren_state(True)
 
-        sensor_descriptions = list(map(lambda alert_sensor: alert_sensor.sensor.description, self._alert.sensors))
+        self._logger.debug("Alerting sensors: %s", self._alert.sensors)
+        sensor_descriptions = list(map(lambda alert_sensor: f"{alert_sensor.sensor.description}(id:{alert_sensor.sensor.id}/CH{alert_sensor.sensor.channel+1})", self._alert.sensors))
         Notifier.notify_alert_started(self._alert.id, sensor_descriptions, start_time)
 
         self._logger.info("Alert started")
