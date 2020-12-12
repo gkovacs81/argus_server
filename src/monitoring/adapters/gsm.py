@@ -17,6 +17,8 @@ from time import sleep
 
 class GSM(object):
 
+    RETRY_GAP = 5
+
     def __init__(self):
         self._logger = logging.getLogger(LOG_ADGSM)
         self._modem = None
@@ -58,19 +60,19 @@ class GSM(object):
                 self._modem = None
                 return False
             except TimeoutException as error:
-                self._logger.error('No answer from GSM module: %s! Request timeout, retry...', str(error))
+                self._logger.error('No answer from GSM module: %s! Request timeout, retry in %s seconds...', str(error), GSM.RETRY_GAP)
             except CmeError as error:
-                self._logger.error('CME error from GSM module: %s! Unexpected error, retry...', str(error))
+                self._logger.error('CME error from GSM module: %s! Unexpected error, retry in %s seconds...', str(error), GSM.RETRY_GAP)
             except CmsError as error:
                 if str(error) == "CMS 302":
-                    self._logger.debug('GSM modem not ready, retry...')
+                    self._logger.debug('GSM modem not ready, retry in %s seconds...', GSM.RETRY_GAP)
                 else:
-                    self._logger.error('CMS error from GSM module: %s. Unexpected error, retry...', str(error))
+                    self._logger.error('CMS error from GSM module: %s. Unexpected error, retry in %s seconds...', str(error), GSM.RETRY_GAP)
             except Exception:
                 self._logger.exception("Failed to access GSM module!")
                 return False
 
-            sleep(5)
+            sleep(GSM.RETRY_GAP)
 
         return True
 
