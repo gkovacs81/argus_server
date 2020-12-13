@@ -121,7 +121,9 @@ def authenticated(role=ROLE_ADMIN):
                             remote_address
                         )
                         return jsonify({"error": "operation not permitted (role)"}), 403
+
                     response = request_handler(*args, **kws)
+                    # generate new user token to extend the user session
                     response.headers["User-Token"] = generate_user_token(token["name"], token["role"])
                     return response
                 except jose.exceptions.JWTError:
@@ -187,7 +189,11 @@ def register_device():
 
         if user:
             if user.registration_expiry and dt.now(tzlocal()) > user.registration_expiry:
-                return jsonify({"error": "expired registration code"}), 400
+                return make_response(jsonify({
+                    "error": "Failed to register device",
+                    "reason": "Expired registration code"}),
+                    400
+                )
 
             user.registration_code = None
             db.session.commit()
@@ -198,8 +204,18 @@ def register_device():
             return jsonify({
                 "device_token": jwt.encode(token, os.environ.get("SECRET"), algorithm="HS256")
             })
+        else:
+            return make_response(jsonify({
+                "error": "Failed to register device",
+                "reason": "User not found"}),
+                400
+            )
 
-    return jsonify(False)
+    return make_response(jsonify({
+        "error": "Failed to register device",
+        "reason": "Missing registration code"}),
+        400
+    )
 
 
 @app.route("/api/alerts", methods=["GET"])
@@ -231,8 +247,8 @@ def users():
         user = User(name=data["name"], role=data["role"], access_code=data["accessCode"])
         db.session.add(user)
         db.session.commit()
-        return jsonify(user.serialize)
 
+    return jsonify(None)
 
 @app.route("/api/user/<int:user_id>", methods=["GET", "PUT", "DELETE"])
 @authenticated()
@@ -242,24 +258,27 @@ def user(user_id):
         if user:
             return jsonify(user.serialize)
 
-        abort(404, 'User not found')
+        return make_response(jsonify({"error": "User not found"}), 404)
     elif request.method == "PUT":
         user = User.query.get(user_id)
         if user:
             if user.update(request.json):
                 db.session.commit()
+                return jsonify(None)
+            else:
+                abort(204)
 
-            return jsonify(True)
-
-        abort(404, 'User not found')
+        return make_response(jsonify({"error": "User not found"}), 404)
     elif request.method == "DELETE":
         user = User.query.get(user_id)
-        db.session.delete(user)
-        db.session.commit()
-        return jsonify(True)
+        if user:
+            db.session.delete(user)
+            db.session.commit()
+            return jsonify(None)
+        else:
+            return make_response(jsonify({"error": "User not found"}), 404)
 
-    return jsonify({"error": "unknonw action"})
-
+    return make_response(jsonify({"error", "Unkown action"}), 400)
 
 @app.route("/api/user/<int:user_id>/registration_code", methods=["GET", "DELETE"])
 @authenticated()
@@ -277,21 +296,25 @@ def registration_code(user_id):
         user = User.query.get(user_id)
         if user:
             if user.registration_code:
-                return jsonify({"error": "already has registration code"}), 400
+                return make_response(jsonify({"error": "Already has registration code"}), 400)
 
             expiry = int(request.args.get('expiry')) if request.args.get('expiry') else None
             code = user.add_registration_code(expiry=expiry)
             db.session.commit()
             return jsonify({"code": code})
+
+        return make_response(jsonify({"error": "User not found"}), 404)
     elif request.method == "DELETE":
         user = User.query.get(user_id)
         if user:
             user.registration_code = None
             user.registration_expiry = None
             db.session.commit()
-            return jsonify(True)
+            return jsonify(None)
+        else:
+            return make_response(jsonify({"error": "User not found"}), 404)
 
-    return jsonify(False)
+    return make_response(jsonify({"error", "Unkown action"}), 400)
 
 
 @app.route("/api/sensors/", methods=["GET"])
@@ -312,7 +335,7 @@ def view_sensors():
 
 @app.route("/api/sensors/", methods=["POST"])
 @authenticated()
-def update_sensors():
+def create_sensor():
     data = request.json
     zone = Zone.query.get(request.json["zoneId"])
     sensor_type = SensorType.query.get(data["typeId"])
@@ -324,9 +347,8 @@ def update_sensors():
     )
     db.session.add(sensor)
     db.session.commit()
-    ipc_client = IPCClient()
-    ipc_client.update_configuration()
-    return jsonify(sensor.serialize)
+
+    return process_ipc_response(IPCClient().update_configuration())
 
 
 @app.route("/api/sensors/reset-references", methods=["PUT"])
@@ -337,8 +359,10 @@ def sensors_reset_references():
             sensor.reference_value = None
 
         db.session.commit()
-        ipc_client = IPCClient()
-        return jsonify(ipc_client.update_configuration())
+
+        return process_ipc_response(IPCClient().update_configuration())
+
+    return make_response(jsonify({"error", "Unkown action"}), 400)
 
 
 @app.route("/api/sensor/<int:sensor_id>", methods=["GET", "PUT", "DELETE"])
@@ -348,28 +372,29 @@ def sensor(sensor_id):
         sensor = Sensor.query.filter_by(id=sensor_id, deleted=False).first()
         if sensor:
             return jsonify(sensor.serialize)
-        abort(404)
+        return jsonify({"error": "Sensor not found"}), (404)
     elif request.method == "DELETE":
         sensor = Sensor.query.get(sensor_id)
         sensor.deleted = True
         db.session.commit()
-        ipc_client = IPCClient()
-        ipc_client.update_configuration()
-        return jsonify(True)
+        return process_ipc_response(IPCClient().update_configuration())
     elif request.method == "PUT":
         sensor = Sensor.query.get(sensor_id)
-        if sensor.update(request.json):
-            db.session.commit()
-            ipc_client = IPCClient()
-            ipc_client.update_configuration()
-        return jsonify(True)
+        if sensor:
+            if sensor.update(request.json):
+                db.session.commit()
+                return process_ipc_response(IPCClient().update_configuration())
+            else:
+                abort(204)
 
-    return jsonify({"error": "unknonw action"})
+        return jsonify({"error": "Sensor not found"}), (404)
+
+    return make_response(jsonify({"error", "Unkown action"}), 400)
 
 
 @app.route("/api/sensortypes")
 @authenticated(role=ROLE_USER)
-def sensortypes():
+def sensor_types():
     # app.logger.debug("Request: %s", request.args.get('alerting'))
     return jsonify([i.serialize for i in SensorType.query.all()])
 
@@ -388,21 +413,20 @@ def get_sensor_alert():
 
 @app.route("/api/zones/", methods=["GET"])
 @authenticated(role=ROLE_USER)
-def view_zones():
+def get_zones():
     return jsonify([i.serialize for i in Zone.query.filter_by(deleted=False).all()])
 
 
 @app.route("/api/zones/", methods=["POST"])
 @authenticated()
-def update_zones():
+def create_zone():
     zone = Zone()
     zone.update(request.json)
     if not zone.description:
         zone.description = zone.name
     db.session.add(zone)
     db.session.commit()
-    ipc_client = IPCClient()
-    ipc_client.update_configuration()
+    IPCClient().update_configuration()
     return jsonify(zone.serialize)
 
 
@@ -410,48 +434,55 @@ def update_zones():
 @authenticated()
 def zone(zone_id):
     if request.method == "GET":
-        return jsonify(Zone.query.get(zone_id).serialize)
+        zone = Zone.query.get(zone_id)
+        if zone:
+            return jsonify(zone.serialize)
+
+        return make_response(jsonify({"error": "Zone not found"}), 404)
     elif request.method == "DELETE":
         zone = Zone.query.get(zone_id)
-        zone.deleted = True
-        db.session.commit()
-        ipc_client = IPCClient()
-        ipc_client.update_configuration()
-        return jsonify(True)
+        if zone:
+            zone.deleted = True
+            db.session.commit()
+            return process_ipc_response(IPCClient().update_configuration())
+
+        return make_response(jsonify({"error": "Zone not found"}), 404)
     elif request.method == "PUT":
         zone = Zone.query.get(zone_id)
-        if zone.update(request.json):
-            ipc_client = IPCClient()
-            ipc_client.update_configuration()
-        db.session.commit()
-        return jsonify(zone.serialize)
+        if zone:
+            if zone.update(request.json):
+                db.session.commit()
+                return process_ipc_response(IPCClient().update_configuration())
+            else:
+                abort(204)
+        else:
+            return make_response(jsonify({"error": "Zone not found"}), 404)
+
+    return make_response(jsonify({"error", "Unkown action"}), 400)
 
 
 @app.route("/api/monitoring/arm", methods=["GET"])
 @registered()
 def get_arm():
-    ipc_client = IPCClient()
-    return jsonify(ipc_client.get_arm())
+    return process_ipc_response(IPCClient().get_arm())
 
 
 @app.route("/api/monitoring/arm", methods=["PUT"])
 @authenticated(role=ROLE_USER)
 def put_arm():
-    ipc_client = IPCClient()
-    return jsonify(ipc_client.arm(request.args.get("type")))
+    return process_ipc_response(IPCClient().arm(request.args.get("type")))
 
 
 @app.route("/api/monitoring/disarm", methods=["PUT"])
 @authenticated(role=ROLE_USER)
 def disarm():
-    return jsonify(IPCClient().disarm())
+    return process_ipc_response(IPCClient().disarm())
 
 
 @app.route("/api/monitoring/state", methods=["GET"])
 @registered()
 def get_state():
-    ipc_client = IPCClient()
-    return jsonify(ipc_client.get_state())
+    return process_ipc_response(IPCClient().get_state())
 
 
 @app.route("/api/config/<string:option>/<string:section>", methods=["GET", "PUT"])
@@ -459,26 +490,29 @@ def get_state():
 def option(option, section):
     if request.method == "GET":
         db_option = Option.query.filter_by(name=option, section=section).first()
-        return jsonify(db_option.serialize) if db_option else jsonify(None)
+        if db_option:
+            return jsonify(db_option.serialize) if db_option else jsonify(None)
+        
+        return make_response(jsonify({"error": "Option not found"}), 404)
     elif request.method == "PUT":
         db_option = Option.query.filter_by(name=option, section=section).first()
-        if db_option is None:
+        if not db_option:
+            # create the new option
             db_option = Option(name=option, section=section, value="")
             db.session.add(db_option)
 
+        # do update
         changed = db_option.update_value(request.json)
         db.session.commit()
 
         if option == "notifications":
             if changed:
-                ipc_client = IPCClient()
-                ipc_client.update_configuration()
+                return process_ipc_response(IPCClient().update_configuration())
         elif db_option.name == "network" and db_option.section == "dyndns":
             if os.environ.get("ARGUS_DEVELOPMENT", "0") == "0":
-                ipc_client = IPCClient()
-                ipc_client.update_dyndns()
+                return process_ipc_response(IPCClient().update_dyndns())
 
-        return jsonify(True)
+    return make_response(jsonify({"error", "Unkown action"}), 400)
 
 
 @app.route("/api/version", methods=["GET"])
@@ -507,12 +541,7 @@ def get_clock():
 
 @app.route("/api/clock", methods=["PUT"])
 def set_clock():
-    ipc_client = IPCClient()
-    return_value = ipc_client.set_clock(request.json)
-    if return_value["result"]:
-        return jsonify(return_value)
-    else:
-        return jsonify(return_value), 500
+    return process_ipc_response(IPCClient().set_clock(request.json))
 
 
 # disabled (time-sync service and hwclock cron job is running)
@@ -534,25 +563,29 @@ def keypad(keypad_id):
         keypad = Keypad.query.first()
         if keypad:
             return jsonify(keypad.serialize)
-        abort(404)
+        
+        return make_response(jsonify({"error": "Option not found"}), 404 )
     elif request.method == "DELETE":
         keypad = Keypad.query.get(keypad_id)
-        keypad.deleted = True
-        db.session.commit()
-        ipc_client = IPCClient()
-        ipc_client.update_keypad()
-        return jsonify(True)
+        if keypad:
+            keypad.deleted = True
+            db.session.commit()
+            return process_ipc_response(IPCClient().update_keypad())
+
+        return make_response(jsonify({"error": "Option not found"}), 404)
     elif request.method == "PUT":
         keypad = Keypad.query.get(keypad_id)
         if not keypad:
+            # create the new keypad
             keypad = Keypad(keypad_type=KeypadType.query.get(request.json["typeId"]))
+
         if keypad.update(request.json):
             db.session.commit()
-            ipc_client = IPCClient()
-            ipc_client.update_keypad()
-        return jsonify(True)
+            return process_ipc_response(IPCClient().update_keypad())
+        else:
+            abort(204)
 
-    return jsonify({"error": "unknonw action"})
+    return make_response(jsonify({"error", "Unkown action"}), 400)
 
 
 @app.route("/api/keypadtypes", methods=["GET"])
@@ -604,6 +637,16 @@ def catch_all(path):
     # or return with the index file
     # app.logger.debug("INDEX without language: %s", join(language, 'index.html'))
     return send_from_directory(argus_application_folder, "index.html")
+
+
+def process_ipc_response(response):
+    if response:
+        if response['result']:
+            return jsonify(response.get('value'))
+        else:
+            return response['message'], 500
+    else:
+        return 'No response from monitoring service', 500
 
 
 if __name__ != "__main__":

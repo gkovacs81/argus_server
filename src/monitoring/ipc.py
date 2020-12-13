@@ -14,7 +14,7 @@ from monitoring.constants import (LOG_IPC, MONITOR_ARM_AWAY, MONITOR_ARM_STAY,
                                   MONITOR_DISARM, MONITOR_SET_CLOCK,
                                   MONITOR_SYNC_CLOCK, MONITOR_UPDATE_CONFIG,
                                   MONITOR_UPDATE_SECURE_CONNECTION, MONITOR_UPDATE_KEYPAD,
-                                  THREAD_IPC)
+                                  THREAD_IPC, MONITOR_GET_ARM, MONITOR_GET_STATE)
 from tools.clock import Clock
 from tools.connection import SecureConnection
 
@@ -64,8 +64,17 @@ class IPCServer(Thread):
             makedirs(path.dirname(filename))
 
     def handle_actions(self, message):
-        result = True
-        response = ""
+        '''
+        Return value:
+        {
+            "result": boolean, # True if succeded
+            "message": string, # Error message
+            "value: dict # value to return
+        }
+        '''
+        return_value = {
+            "result": True
+        }
         if message["action"] == MONITOR_ARM_AWAY:
             self._logger.info("Action: arm AWAY")
             self._broadcaster.send_message(MONITOR_ARM_AWAY)
@@ -75,11 +84,10 @@ class IPCServer(Thread):
         elif message["action"] == MONITOR_DISARM:
             self._logger.info("Action: disarm")
             self._broadcaster.send_message(MONITOR_DISARM)
-        elif message["action"] == "get_arm":
-            arm = storage.get("arm")
-            return {"type": arm}
-        elif message["action"] == "get_state":
-            return {"state": storage.get("state")}
+        elif message["action"] == MONITOR_GET_ARM:
+            return_value["value"] = {"type": storage.get("arm")}
+        elif message["action"] == MONITOR_GET_STATE:
+            return_value["value"] = {"state": storage.get("state")}
         elif message["action"] == MONITOR_UPDATE_CONFIG:
             self._logger.info("Update configuration...")
             self._broadcaster.send_message(MONITOR_UPDATE_CONFIG)
@@ -90,16 +98,13 @@ class IPCServer(Thread):
             self._logger.info("Update secure connection...")
             SecureConnection(self._stop_event).run()
         elif message["action"] == MONITOR_SYNC_CLOCK:
-            Clock().sync_clock()
+            if not Clock().sync_clock():
+                return_value["result"] = False
+                return_value["message"] = "Failed to sync time"
         elif message["action"] == MONITOR_SET_CLOCK:
             if not Clock().set_clock(message):
-                result = False
-                response = "Failed to update date/time and zone"
-
-        return_value = {"result": result}
-
-        if message:
-            return_value["message"] = response
+                return_value["result"] = False
+                return_value["message"] = "Failed to update date/time and zone"
 
         return return_value
 
