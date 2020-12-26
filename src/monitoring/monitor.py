@@ -263,7 +263,7 @@ class Monitor(Thread):
                     sensor.alert = False
                     changes = True
 
-            if sensor.alert:
+            if sensor.alert and sensor.enabled:
                 found_alert = True
 
         if changes:
