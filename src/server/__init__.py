@@ -1,13 +1,14 @@
-from datetime import datetime as dt
 import functools
 import logging
 import os
-from os.path import isfile, join
 import re
+from datetime import datetime as dt
+from os.path import isfile, join
 
 import jose.exceptions
 from dateutil.tz import UTC, tzlocal
-from flask import Flask, abort, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
+from flask.helpers import make_response
 from flask_sqlalchemy import SQLAlchemy
 from jose import jwt
 
@@ -143,7 +144,7 @@ def handle_validation_errors(error):
     return jsonify({'error': str(error)}), 400
 
 
-@app.route("/api/authenticate", methods=["GET", "POST"])
+@app.route("/api/authenticate", methods=["POST"])
 def authenticate():
     # app.logger.debug("Authenticating...")
     remote_address = (
@@ -266,7 +267,7 @@ def user(user_id):
                 db.session.commit()
                 return jsonify(None)
             else:
-                abort(204)
+                return make_response('', 204)
 
         return make_response(jsonify({"error": "User not found"}), 404)
     elif request.method == "DELETE":
@@ -278,7 +279,7 @@ def user(user_id):
         else:
             return make_response(jsonify({"error": "User not found"}), 404)
 
-    return make_response(jsonify({"error", "Unkown action"}), 400)
+    return make_response(jsonify({"error": "Unknown action"}), 400)
 
 @app.route("/api/user/<int:user_id>/registration_code", methods=["GET", "DELETE"])
 @authenticated()
@@ -314,7 +315,7 @@ def registration_code(user_id):
         else:
             return make_response(jsonify({"error": "User not found"}), 404)
 
-    return make_response(jsonify({"error", "Unkown action"}), 400)
+    return make_response(jsonify({"error": "Unknown action"}), 400)
 
 
 @app.route("/api/sensors/", methods=["GET"])
@@ -362,7 +363,7 @@ def sensors_reset_references():
 
         return process_ipc_response(IPCClient().update_configuration())
 
-    return make_response(jsonify({"error", "Unkown action"}), 400)
+    return make_response(jsonify({"error": "Unknown action"}), 400)
 
 
 @app.route("/api/sensor/<int:sensor_id>", methods=["GET", "PUT", "DELETE"])
@@ -385,11 +386,11 @@ def sensor(sensor_id):
                 db.session.commit()
                 return process_ipc_response(IPCClient().update_configuration())
             else:
-                abort(204)
+                return make_response('', 204)
 
         return jsonify({"error": "Sensor not found"}), (404)
 
-    return make_response(jsonify({"error", "Unkown action"}), 400)
+    return make_response(jsonify({"error": "Unknown action"}), 400)
 
 
 @app.route("/api/sensortypes")
@@ -454,11 +455,11 @@ def zone(zone_id):
                 db.session.commit()
                 return process_ipc_response(IPCClient().update_configuration())
             else:
-                abort(204)
+                return make_response('', 204)
         else:
             return make_response(jsonify({"error": "Zone not found"}), 404)
 
-    return make_response(jsonify({"error", "Unkown action"}), 400)
+    return make_response(jsonify({"error": "Unknown action"}), 400)
 
 
 @app.route("/api/monitoring/arm", methods=["GET"])
@@ -492,7 +493,7 @@ def option(option, section):
         db_option = Option.query.filter_by(name=option, section=section).first()
         if db_option:
             return jsonify(db_option.serialize) if db_option else jsonify(None)
-        
+
         return make_response(jsonify({"error": "Option not found"}), 404)
     elif request.method == "PUT":
         db_option = Option.query.filter_by(name=option, section=section).first()
@@ -512,7 +513,9 @@ def option(option, section):
             if os.environ.get("ARGUS_DEVELOPMENT", "0") == "0":
                 return process_ipc_response(IPCClient().update_dyndns())
 
-    return make_response(jsonify({"error", "Unkown action"}), 400)
+        return make_response('', 204)
+
+    return make_response(jsonify({"error": "Unknown action"}), 400)
 
 
 @app.route("/api/version", methods=["GET"])
@@ -583,9 +586,9 @@ def keypad(keypad_id):
             db.session.commit()
             return process_ipc_response(IPCClient().update_keypad())
         else:
-            abort(204)
+            return make_response('', 204)
 
-    return make_response(jsonify({"error", "Unkown action"}), 400)
+    return make_response(jsonify({"error": "Unknown action"}), 400)
 
 
 @app.route("/api/keypadtypes", methods=["GET"])
@@ -644,9 +647,9 @@ def process_ipc_response(response):
         if response['result']:
             return jsonify(response.get('value'))
         else:
-            return response['message'], 500
+            return make_response(jsonify({'message': response['message']}), 500)
     else:
-        return 'No response from monitoring service', 500
+        return make_response(jsonify({'message': 'No response from monitoring service'}), 503)
 
 
 if __name__ != "__main__":
