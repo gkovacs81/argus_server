@@ -29,6 +29,8 @@ class GSM(object):
                           self._options['baud'],
                           self._options['pin_code'])
 
+        return True
+
     def destroy(self):
         pass
 
