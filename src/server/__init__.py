@@ -1,9 +1,11 @@
 import functools
+import json
 import logging
 import os
 import re
 from datetime import datetime as dt
 from os.path import isfile, join
+from urllib.parse import urlparse
 
 import jose.exceptions
 from dateutil.tz import UTC, tzlocal
@@ -50,41 +52,54 @@ def root():
     return send_from_directory(argus_application_folder, "index.html")
 
 
-def registered():
-    def _registered(request_handler):
-        @functools.wraps(request_handler)
-        def check_access(*args, **kws):
-            auth_header = request.headers.get("Authorization")
-            # app.logger.info("Header: %s", auth_header)
-            remote_address = (
-                request.remote_addr
-                if request.remote_addr != "b''"
-                else request.headers.get("X-Real-Ip")
-            )
-            # app.logger.debug("Input from '%s': '%s'", remote_address, request.json)
+def restrict_host(request_handler):
+    @functools.wraps(request_handler)
+    def _restrict_host(*args, **kws):
+        noip_config = Option.query.filter_by(name='network', section='dyndns').first()
+        if noip_config:
+            noip_config = json.loads(noip_config.value)
 
-            raw_token = auth_header.split(" ")[1] if auth_header else ""
-            if raw_token:
-                # app.logger.info("Token: %s", token)
-                try:
-                    token = jwt.decode(raw_token, os.environ.get("SECRET"), algorithms="HS256")
-                    return request_handler(*args, **kws)
-                except jose.exceptions.JWTError:
-                    app.logger.info("Bad token (%s) from %s", raw_token, request.remote_addr)
-                    return jsonify({"error": "operation not permitted (wrong token)"}), 403
-            else:
-                app.logger.info("Request without authentication info from %s", request.remote_addr)
-                return jsonify({"error": "operation not permitted (missing token)"}), 403
+        if noip_config.get("restrict_host", False):
+            allowed_hostname = noip_config.get("hostname", None)
+            actual_hostname = request.environ["HTTP_HOST"].split(':')[0]
+            if allowed_hostname and allowed_hostname != actual_hostname:
+                app.logger.warn("Not allowed host (%s) != %s", allowed_hostname, actual_hostname)
+                # don't use tuple as a response to avoid exception using multiple decorators
+                response = jsonify({"error": "host not allowed"})
+                response.status_code = 401
+                return response
 
-        return check_access
+        return request_handler(*args, **kws)
+
+    return _restrict_host
+
+
+def registered(request_handler):
+    @functools.wraps(request_handler)
+    def _registered(*args, **kws):
+        auth_header = request.headers.get("Authorization")
+        # app.logger.info("Header: %s", auth_header)
+        raw_token = auth_header.split(" ")[1] if auth_header else ""
+        if raw_token:
+            # app.logger.info("Token: %s", token)
+            try:
+                token = jwt.decode(raw_token, os.environ.get("SECRET"), algorithms="HS256")
+                return request_handler(*args, **kws)
+            except jose.exceptions.JWTError:
+                app.logger.warn("Bad token (%s) from %s", raw_token, request.remote_addr)
+                return jsonify({"error": "operation not permitted (wrong token)"}), 403
+        else:
+            app.logger.info("Request without authentication info from %s", request.remote_addr)
+            return jsonify({"error": "operation not permitted (missing token)"}), 403
 
     return _registered
 
 
-def generate_user_token(name, role):
+def generate_user_token(name, role, origin):
     token = {
         "name": name,
         "role": role,
+        "origin": origin,
         "timestamp": int(dt.now(tz=UTC).timestamp())
     }
 
@@ -97,11 +112,7 @@ def authenticated(role=ROLE_ADMIN):
         def check_access(*args, **kws):
             auth_header = request.headers.get("Authorization")
             # app.logger.info("Header: %s", auth_header)
-            remote_address = (
-                request.remote_addr
-                if request.remote_addr != "b''"
-                else request.headers.get("X-Real-Ip")
-            )
+            remote_address = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
             # app.logger.debug("Input from '%s': '%s'", remote_address, request.json)
 
             raw_token = auth_header.split(" ")[1] if auth_header else ""
@@ -112,6 +123,13 @@ def authenticated(role=ROLE_ADMIN):
                     if int(token["timestamp"]) < int(dt.now(tz=UTC).timestamp()) - USER_TOKEN_EXPIRY:
                         return jsonify({"error": "token expired"}), 401
 
+                    # HTTP_ORIGIN is not always sent
+                    referer = urlparse(request.environ["HTTP_REFERER"])
+                    origin = urlparse(token["origin"])
+
+                    if origin.scheme != referer.scheme or origin.netloc != referer.netloc:
+                        return jsonify({"error": f"invalid origin {origin} <> {referer}"}), 401
+
                     if (role == ROLE_USER and token["role"] not in (ROLE_USER, ROLE_ADMIN)) or \
                        (role == ROLE_ADMIN and token["role"] not in (ROLE_ADMIN,)):
                         app.logger.info(
@@ -119,19 +137,20 @@ def authenticated(role=ROLE_ADMIN):
                             request,
                             token["name"],
                             token["role"],
+                            token["origin"],
                             remote_address
                         )
                         return jsonify({"error": "operation not permitted (role)"}), 403
 
                     response = request_handler(*args, **kws)
                     # generate new user token to extend the user session
-                    response.headers["User-Token"] = generate_user_token(token["name"], token["role"])
+                    response.headers["User-Token"] = generate_user_token(token["name"], token["role"], f"{origin.scheme}://{origin.netloc}")
                     return response
                 except jose.exceptions.JWTError:
-                    app.logger.info("Bad token (%s) from %s", raw_token, request.remote_addr)
+                    app.logger.warn("Bad token (%s) from %s", raw_token, remote_address)
                     return jsonify({"error": "operation not permitted (wrong token)"}), 403
             else:
-                app.logger.info("Request without authentication info from %s", request.remote_addr)
+                app.logger.warn("Request without authentication info from %s", remote_address)
                 return jsonify({"error": "operation not permitted (missing token)"}), 403
 
         return check_access
@@ -145,13 +164,9 @@ def handle_validation_errors(error):
 
 
 @app.route("/api/authenticate", methods=["POST"])
+@restrict_host
 def authenticate():
     # app.logger.debug("Authenticating...")
-    remote_address = (
-        request.remote_addr
-        if request.remote_addr != "b''"
-        else request.headers.get("X-Real-Ip")
-    )
     try:
         device_token = jwt.decode(request.json["device_token"], os.environ.get("SECRET"), algorithms="HS256")
     except jose.exceptions.JWTError:
@@ -161,13 +176,19 @@ def authenticate():
         app.logger.info("Missing device token from %s", request.remote_addr)
         return jsonify({"error": "missing device token"}), 400
 
+    # TODO: the client IP can change for mobile devices!?
+    remote_address = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
     if device_token["ip"] != remote_address:
         app.logger.warn("User access from not the registered IP: %s != %s", device_token["ip"], remote_address)
+
+    if device_token["origin"] != request.environ["HTTP_ORIGIN"]:
+        app.logger.warn("User access from not the registered origin: %s != %s", device_token["ip"], request.environ["HTTP_ORIGIN"])
+        return jsonify({"error": "invalid origin"}), 400
 
     user = User.query.get(device_token["user_id"])
     if user and user.access_code == hash_code(request.json["access_code"]):
         return jsonify({
-            "user_token": generate_user_token(user.name, user.role),
+            "user_token": generate_user_token(user.name, user.role, request.environ["HTTP_ORIGIN"]),
         })
     elif not user:
         return jsonify({"error": "invalid user id"}), 400
@@ -176,15 +197,12 @@ def authenticate():
 
 
 @app.route("/api/register_device", methods=["POST"])
+@restrict_host
 def register_device():
     app.logger.debug("Authenticating...")
-    # check user credentials and return fake jwt token if valid
-    remote_address = (
-        request.remote_addr
-        if request.remote_addr != "b''"
-        else request.headers.get("X-Real-Ip")
-    )
-    app.logger.debug("Input from '%s': '%s'", remote_address, request.json)
+
+    remote_address = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
+    app.logger.debug("Input from '%s' on '%s': '%s'", remote_address, request.environ["HTTP_ORIGIN"], request.json)
     if request.json["registration_code"]:
         user = User.query.filter_by(registration_code=hash_code(request.json["registration_code"].upper())).first()
 
@@ -200,6 +218,7 @@ def register_device():
             db.session.commit()
             token = {
                 "ip": remote_address,
+                "origin": request.environ["HTTP_ORIGIN"],
                 "user_id": user.id
             }
             return jsonify({
@@ -221,13 +240,15 @@ def register_device():
 
 @app.route("/api/alerts", methods=["GET"])
 @authenticated(role=ROLE_USER)
+@restrict_host
 def get_alerts():
     # app.logger.debug("Request: %s", request.args.get('alerting'))
     return jsonify([i.serialize for i in Alert.query.order_by(Alert.start_time.desc())])
 
 
 @app.route("/api/alert", methods=["GET"])
-@registered()
+@registered
+@restrict_host
 def get_alert():
     alert = (
         Alert.query.filter_by(end_time=None).order_by(Alert.start_time.desc()).first()
@@ -240,6 +261,7 @@ def get_alert():
 
 @app.route("/api/users", methods=["GET", "POST"])
 @authenticated()
+@restrict_host
 def users():
     if request.method == "GET":
         return jsonify([i.serialize for i in User.query.order_by(User.role).all()])
@@ -253,6 +275,7 @@ def users():
 
 @app.route("/api/user/<int:user_id>", methods=["GET", "PUT", "DELETE"])
 @authenticated()
+@restrict_host
 def user(user_id):
     if request.method == "GET":
         user = User.query.get(user_id)
@@ -283,15 +306,12 @@ def user(user_id):
 
 @app.route("/api/user/<int:user_id>/registration_code", methods=["GET", "DELETE"])
 @authenticated()
+@restrict_host
 def registration_code(user_id):
     app.logger.debug("Authenticating...")
     # check user credentials and return fake jwt token if valid
-    remote_address = (
-        request.remote_addr
-        if request.remote_addr != "b''"
-        else request.headers.get("X-Real-Ip")
-    )
-    app.logger.debug("Input from '%s': '%s'", remote_address, request.json)
+    remote_address = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
+    app.logger.debug("Input from '%s' on '%s': '%s'", remote_address, request.environ["HTTP_ORIGIN"], request.json)
 
     if request.method == "GET":
         user = User.query.get(user_id)
@@ -320,6 +340,7 @@ def registration_code(user_id):
 
 @app.route("/api/sensors/", methods=["GET"])
 @authenticated(role=ROLE_USER)
+@restrict_host
 def view_sensors():
     # app.logger.debug("Request: %s", request.args.get('alerting'))
     if not request.args.get("alerting"):
@@ -336,6 +357,7 @@ def view_sensors():
 
 @app.route("/api/sensors/", methods=["POST"])
 @authenticated()
+@restrict_host
 def create_sensor():
     data = request.json
     zone = Zone.query.get(request.json["zoneId"])
@@ -354,6 +376,7 @@ def create_sensor():
 
 @app.route("/api/sensors/reset-references", methods=["PUT"])
 @authenticated()
+@restrict_host
 def sensors_reset_references():
     if request.method == "PUT":
         for sensor in Sensor.query.all():
@@ -368,6 +391,7 @@ def sensors_reset_references():
 
 @app.route("/api/sensor/<int:sensor_id>", methods=["GET", "PUT", "DELETE"])
 @authenticated()
+@restrict_host
 def sensor(sensor_id):
     if request.method == "GET":
         sensor = Sensor.query.filter_by(id=sensor_id, deleted=False).first()
@@ -395,13 +419,15 @@ def sensor(sensor_id):
 
 @app.route("/api/sensortypes")
 @authenticated(role=ROLE_USER)
+@restrict_host
 def sensor_types():
     # app.logger.debug("Request: %s", request.args.get('alerting'))
     return jsonify([i.serialize for i in SensorType.query.all()])
 
 
 @app.route("/api/sensor/alert", methods=["GET"])
-@registered()
+@registered
+@restrict_host
 def get_sensor_alert():
     if request.args.get("sensorId"):
         return jsonify(
@@ -414,12 +440,14 @@ def get_sensor_alert():
 
 @app.route("/api/zones/", methods=["GET"])
 @authenticated(role=ROLE_USER)
+@restrict_host
 def get_zones():
     return jsonify([i.serialize for i in Zone.query.filter_by(deleted=False).all()])
 
 
 @app.route("/api/zones/", methods=["POST"])
 @authenticated()
+@restrict_host
 def create_zone():
     zone = Zone()
     zone.update(request.json)
@@ -433,6 +461,7 @@ def create_zone():
 
 @app.route("/api/zone/<int:zone_id>", methods=["GET", "PUT", "DELETE"])
 @authenticated()
+@restrict_host
 def zone(zone_id):
     if request.method == "GET":
         zone = Zone.query.get(zone_id)
@@ -463,31 +492,36 @@ def zone(zone_id):
 
 
 @app.route("/api/monitoring/arm", methods=["GET"])
-@registered()
+@registered
+@restrict_host
 def get_arm():
     return process_ipc_response(IPCClient().get_arm())
 
 
 @app.route("/api/monitoring/arm", methods=["PUT"])
 @authenticated(role=ROLE_USER)
+@restrict_host
 def put_arm():
     return process_ipc_response(IPCClient().arm(request.args.get("type")))
 
 
 @app.route("/api/monitoring/disarm", methods=["PUT"])
 @authenticated(role=ROLE_USER)
+@restrict_host
 def disarm():
     return process_ipc_response(IPCClient().disarm())
 
 
 @app.route("/api/monitoring/state", methods=["GET"])
-@registered()
+@registered
+@restrict_host
 def get_state():
     return process_ipc_response(IPCClient().get_state())
 
 
 @app.route("/api/config/<string:option>/<string:section>", methods=["GET", "PUT"])
 @authenticated()
+@restrict_host
 def option(option, section):
     if request.method == "GET":
         db_option = Option.query.filter_by(name=option, section=section).first()
@@ -519,12 +553,14 @@ def option(option, section):
 
 
 @app.route("/api/version", methods=["GET"])
+@restrict_host
 def version():
     return __version__
 
 
 @app.route("/api/clock", methods=["GET"])
 @authenticated()
+@restrict_host
 def get_clock():
     clock = Clock()
     result = {
@@ -543,6 +579,7 @@ def get_clock():
 
 
 @app.route("/api/clock", methods=["PUT"])
+@restrict_host
 def set_clock():
     return process_ipc_response(IPCClient().set_clock(request.json))
 
@@ -557,6 +594,7 @@ def set_clock():
 
 @app.route("/api/keypads/", methods=["GET"])
 @authenticated(role=ROLE_USER)
+@restrict_host
 def get_keypads():
     #return jsonify([i.serialize for i in Keypad.query.filter_by(deleted=False).all()])
     return jsonify([i.serialize for i in Keypad.query.all()])
@@ -564,6 +602,7 @@ def get_keypads():
 
 @app.route("/api/keypad/<int:keypad_id>", methods=["GET", "PUT", "DELETE"])
 @authenticated()
+@restrict_host
 def keypad(keypad_id):
     '''
     Limited to handle only one keypad!
@@ -599,6 +638,7 @@ def keypad(keypad_id):
 
 @app.route("/api/keypadtypes", methods=["GET"])
 @authenticated()
+@restrict_host
 def keypadtypes():
     # app.logger.debug("Request: %s", request.args.get('alerting'))
     return jsonify([i.serialize for i in KeypadType.query.all()])
@@ -606,6 +646,7 @@ def keypadtypes():
 
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
+@restrict_host
 def catch_all(path):
     # app.logger.debug("Working in: %s", os.environ.get('SERVER_STATIC_FOLDER', ''))
     # app.logger.debug("FALLBACK for path: %s", path)

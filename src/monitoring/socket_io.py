@@ -4,28 +4,44 @@ Created on 2017. szept. 23.
 @author: gkovacs
 """
 
+import json
 import logging
 import os
 import socketio
 
 
 from flask import Flask
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlparse
 from jose import jwt
 import jose.exceptions
 
+from models import Option, db
 from monitoring.constants import LOG_SOCKETIO
 
 
+noip_config = Option.query.filter_by(name='network', section='dyndns').first()
+if noip_config:
+    noip_config = json.loads(noip_config.value)
+
+if noip_config.get("restrict_host", False) and noip_config.get("hostname", None):
+    allowed_origins = f"https://{noip_config['hostname']}"
+else:
+    allowed_origins = "*"
+
+if len(allowed_origins) == 1:
+    allowed_origins = allowed_origins[0]
+
 sio = socketio.Server(
         async_mode="threading",
-        cors_allowed_origins=os.environ['APPLICATION_URIS'].split(',')
+        cors_allowed_origins=allowed_origins
 )
 logger = logging.getLogger(LOG_SOCKETIO)
 logging.getLogger("werkzeug").setLevel(logging.DEBUG)
 
 
 def start_socketio():
+    logger.info("Server CORS allowed on '%s'", allowed_origins)
+
     app = Flask(__name__)
     # wrap Flask application with socketio's middleware
     app.wsgi_app = socketio.WSGIApp(sio, app.wsgi_app)
@@ -38,26 +54,31 @@ def start_socketio():
 
 @sio.on("connect")
 def connect(sid, environ):
-    logger.info("Server CORS allowed: %s", os.environ['APPLICATION_URIS'].split(','))
-    logger.debug("Client: %s", sid)
-    # logger.debug('Client info "%s": %s', sid, environ)
-    qs = parse_qs(environ["QUERY_STRING"])
-    remote_address = environ["REMOTE_ADDR"]
+    logger.debug('Client info "%s": %s', sid, environ)
+    query_string = parse_qs(environ["QUERY_STRING"])
+    remote_address = environ.get("HTTP_X_REAL_IP", environ.get("REMOTE_ADDR", ""))
     try:
         device_info = jwt.decode(
-            qs["token"][0], os.environ.get("SECRET"), algorithms="HS256"
+            query_string["token"][0], os.environ.get("SECRET"), algorithms="HS256"
         )
-        # unfortunately we can't get back the correct remote address
-        #         if 'ip' in device_info and device_info['ip'] != remote_address:
-        #             logger.info("Authentication failed from '%s'! device info='%s'", remote_address, device_info)
-        #             return False
-        logger.info("New connection from '%s'", device_info["ip"])
+        logger.info("Connecting with device info: %s", device_info)
+
+        # TODO: the client IP can change for mobile devices!?
+        if device_info.get("ip", "") != remote_address:
+            logger.info("Authentication failed from IP '%s'!= '%s'", device_info["ip"], remote_address)
+            return False
+
+        referer = urlparse(environ["HTTP_REFERER"])
+        origin = urlparse(device_info["origin"])
+        
+        if origin.scheme != referer.scheme or origin.netloc != referer.netloc:
+            logger.info("Authentication failed from origin '%s'!= '%s'", origin, referer)
+            return False
+
+        logger.info("New connection from '%s' =>'%s'", device_info["ip"], device_info["origin"])
+        logger.debug("New connection from '%s': %s =>'%s'", sid, environ, device_info)
     except jose.exceptions.JWTError:
-        logger.error(
-            "Authentication failed from '%s'! token='%s'",
-            remote_address,
-            qs["token"][0],
-        )
+        logger.error("Authentication failed from '%s'! token='%s'", remote_address, query_string["token"][0])
         return False
 
 
