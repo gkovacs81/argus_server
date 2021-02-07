@@ -555,6 +555,12 @@ def set_clock():
 
 #     return jsonify(True)
 
+@app.route("/api/keypads/", methods=["GET"])
+@authenticated(role=ROLE_USER)
+def get_keypads():
+    #return jsonify([i.serialize for i in Keypad.query.filter_by(deleted=False).all()])
+    return jsonify([i.serialize for i in Keypad.query.all()])
+
 
 @app.route("/api/keypad/<int:keypad_id>", methods=["GET", "PUT", "DELETE"])
 @authenticated()
