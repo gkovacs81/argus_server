@@ -7,11 +7,15 @@ import uuid
 from copy import deepcopy
 from re import search
 
+from sqlalchemy import MetaData, Column, Integer, String, Float, Boolean, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.sql.schema import ForeignKey
+from sqlalchemy.orm import relationship, backref
+
 from tools.dictionary import merge_dicts, filter_keys
 from sqlalchemy.orm.mapper import validates
 from stringcase import camelcase, snakecase
 
-from server import db
 
 
 def hash_code(access_code):
@@ -26,8 +30,10 @@ def convert2camel(data):
 
     return converted
 
+metadata = MetaData()
+Base = declarative_base(metadata=metadata)
 
-class BaseModel(db.Model):
+class BaseModel(Base):
     """Base data model for all objects"""
 
     __abstract__ = True
@@ -72,9 +78,9 @@ class SensorType(BaseModel):
 
     NAME_LENGTH = 16
 
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(NAME_LENGTH))
-    description = db.Column(db.String)
+    id = Column(Integer, primary_key=True)
+    name = Column(String(NAME_LENGTH))
+    description = Column(String)
 
     def __init__(self, id, name, description):
         self.id = id
@@ -98,20 +104,20 @@ class Sensor(BaseModel):
 
     __tablename__ = "sensor"
 
-    id = db.Column(db.Integer, primary_key=True)
-    channel = db.Column(db.Integer, nullable=False)
-    reference_value = db.Column(db.Float)
-    alert = db.Column(db.Boolean, default=False)
-    enabled = db.Column(db.Boolean, default=True)
-    deleted = db.Column(db.Boolean, default=False)
-    description = db.Column(db.String, nullable=False)
+    id = Column(Integer, primary_key=True)
+    channel = Column(Integer, nullable=False)
+    reference_value = Column(Float)
+    alert = Column(Boolean, default=False)
+    enabled = Column(Boolean, default=True)
+    deleted = Column(Boolean, default=False)
+    description = Column(String, nullable=False)
 
-    zone_id = db.Column(db.Integer, db.ForeignKey("zone.id"), nullable=False)
-    zone = db.relationship("Zone", backref=db.backref("zone", lazy="dynamic"))
+    zone_id = Column(Integer, ForeignKey("zone.id"), nullable=False)
+    zone = relationship("Zone", backref=backref("zone", lazy="dynamic"))
 
-    type_id = db.Column(db.Integer, db.ForeignKey("sensor_type.id"), nullable=False)
-    type = db.relationship("SensorType", backref=db.backref("sensor_type", lazy="dynamic"))
-    alerts = db.relationship("AlertSensor", back_populates="sensor")
+    type_id = Column(Integer, ForeignKey("sensor_type.id"), nullable=False)
+    type = relationship("SensorType", backref=backref("sensor_type", lazy="dynamic"))
+    alerts = relationship("AlertSensor", back_populates="sensor")
 
     def __init__(self, channel, sensor_type, zone=None, description=None):
         self.channel = channel
@@ -146,11 +152,11 @@ class Alert(BaseModel):
 
     __tablename__ = "alert"
 
-    id = db.Column(db.Integer, primary_key=True)
-    alert_type = db.Column(db.String)
-    start_time = db.Column(db.DateTime(timezone=True))
-    end_time = db.Column(db.DateTime(timezone=True))
-    sensors = db.relationship("AlertSensor", back_populates="alert")
+    id = Column(Integer, primary_key=True)
+    alert_type = Column(String)
+    start_time = Column(DateTime(timezone=True))
+    end_time = Column(DateTime(timezone=True))
+    sensors = relationship("AlertSensor", back_populates="alert")
 
     def __init__(self, alert_type, start_time, sensors, end_time=None):
         self.alert_type = alert_type
@@ -172,13 +178,13 @@ class Alert(BaseModel):
 
 class AlertSensor(BaseModel):
     __tablename__ = "alert_sensor"
-    alert_id = db.Column(db.Integer, db.ForeignKey("alert.id"), primary_key=True)
-    sensor_id = db.Column(db.Integer, db.ForeignKey("sensor.id"), primary_key=True)
-    channel = db.Column(db.Integer)
-    type_id = db.Column(db.Integer, db.ForeignKey("sensor_type.id"), nullable=False)
-    description = db.Column(db.String)
-    sensor = db.relationship("Sensor", back_populates="alerts")
-    alert = db.relationship("Alert", back_populates="sensors")
+    alert_id = Column(Integer, ForeignKey("alert.id"), primary_key=True)
+    sensor_id = Column(Integer, ForeignKey("sensor.id"), primary_key=True)
+    channel = Column(Integer)
+    type_id = Column(Integer, ForeignKey("sensor_type.id"), nullable=False)
+    description = Column(String)
+    sensor = relationship("Sensor", back_populates="alerts")
+    alert = relationship("Alert", back_populates="sensors")
 
     def __init__(self, channel, type_id, description):
         self.channel = channel
@@ -199,13 +205,13 @@ class Zone(BaseModel):
 
     NAME_LENGTH = 32
 
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(NAME_LENGTH), nullable=False)
-    description = db.Column(db.String, nullable=False)
-    disarmed_delay = db.Column(db.Integer, default=None, nullable=True)
-    away_delay = db.Column(db.Integer, default=None, nullable=True)
-    stay_delay = db.Column(db.Integer, default=None, nullable=True)
-    deleted = db.Column(db.Boolean, default=False)
+    id = Column(Integer, primary_key=True)
+    name = Column(String(NAME_LENGTH), nullable=False)
+    description = Column(String, nullable=False)
+    disarmed_delay = Column(Integer, default=None, nullable=True)
+    away_delay = Column(Integer, default=None, nullable=True)
+    stay_delay = Column(Integer, default=None, nullable=True)
+    deleted = Column(Boolean, default=False)
 
     def __init__(self, name="zone", disarmed_delay=None, away_delay=0, stay_delay=0, description="Default zone"):
         self.name = name
@@ -243,15 +249,15 @@ class User(BaseModel):
     EMAIL_LENGTH = 255
     REGISTRATION_CODE_LENGTH = 64
 
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(NAME_LENGTH), nullable=False)
-    email = db.Column(db.String(EMAIL_LENGTH), nullable=True)
-    role = db.Column(db.String(12), nullable=False)
-    registration_code = db.Column(db.String(REGISTRATION_CODE_LENGTH), unique=True, nullable=True)
-    registration_expiry = db.Column(db.DateTime(timezone=True))
-    access_code = db.Column(db.String(64), unique=False, nullable=False)
-    fourkey_code = db.Column(db.String(64), nullable=False)
-    comment = db.Column(db.String, nullable=True)
+    id = Column(Integer, primary_key=True)
+    name = Column(String(NAME_LENGTH), nullable=False)
+    email = Column(String(EMAIL_LENGTH), nullable=True)
+    role = Column(String(12), nullable=False)
+    registration_code = Column(String(REGISTRATION_CODE_LENGTH), unique=True, nullable=True)
+    registration_expiry = Column(DateTime(timezone=True))
+    access_code = Column(String(64), unique=False, nullable=False)
+    fourkey_code = Column(String(64), nullable=False)
+    comment = Column(String, nullable=True)
 
     def __init__(self, name, role, access_code, fourkey_code=None):
         self.id = int(str(uuid.uuid1(1000).int)[:8])
@@ -328,10 +334,10 @@ class Option(BaseModel):
 
     OPTION_LENGTH = 32
 
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(OPTION_LENGTH), nullable=False)
-    section = db.Column(db.String(OPTION_LENGTH), nullable=False)
-    value = db.Column(db.String)
+    id = Column(Integer, primary_key=True)
+    name = Column(String(OPTION_LENGTH), nullable=False)
+    section = Column(String(OPTION_LENGTH), nullable=False)
+    value = Column(String)
 
     def __init__(self, name, section, value):
         self.name = name
@@ -380,11 +386,11 @@ class Keypad(BaseModel):
 
     __tablename__ = "keypad"
 
-    id = db.Column(db.Integer, primary_key=True)
-    enabled = db.Column(db.Boolean, default=True)
+    id = Column(Integer, primary_key=True)
+    enabled = Column(Boolean, default=True)
 
-    type_id = db.Column(db.Integer, db.ForeignKey("keypad_type.id"), nullable=False)
-    type = db.relationship("KeypadType", backref=db.backref("keypad_type", lazy="dynamic"))
+    type_id = Column(Integer, ForeignKey("keypad_type.id"), nullable=False)
+    type = relationship("KeypadType", backref=backref("keypad_type", lazy="dynamic"))
 
     def __init__(self, keypad_type, enabled=True):
         self.type = keypad_type
@@ -405,9 +411,9 @@ class KeypadType(BaseModel):
 
     __tablename__ = "keypad_type"
 
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(32))
-    description = db.Column(db.String)
+    id = Column(Integer, primary_key=True)
+    name = Column(String(32))
+    description = Column(String)
 
     def __init__(self, id, name, description):
         self.id = id

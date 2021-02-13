@@ -10,14 +10,15 @@ import pytz
 from threading import Thread, BoundedSemaphore
 from time import time
 
-from models import db, Alert, AlertSensor, Sensor
+from models import Alert, AlertSensor, Sensor
+from monitoring import storage
 from monitoring.adapters.syren import SyrenAdapter
+from monitoring.database import Session
+from monitoring.notifications.notifier import Notifier
 from monitoring.socket_io import send_syren_state, send_alert_state, send_system_state_change
 from monitoring.constants import ALERT_SABOTAGE, MONITORING_SABOTAGE, LOG_ALERT, THREAD_ALERT
 from multiprocessing import Queue
 from queue import Empty
-from monitoring import storage
-from monitoring.notifications.notifier import Notifier
 
 
 SYREN_DEFAULT_ALERT_TIME = 10
@@ -89,7 +90,7 @@ class SyrenAlert(Thread):
 
     def run(self):
         if not self._db_session:
-            self._db_session = db.create_scoped_session()
+            self._db_session = Session()
 
         self.start_alert()
         start_time = time()

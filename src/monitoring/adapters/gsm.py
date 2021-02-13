@@ -10,8 +10,9 @@ import os
 from gsmmodem.modem import GsmModem
 from gsmmodem.exceptions import PinRequiredError, IncorrectPinError, TimeoutException, CmeError, CmsError,\
     CommandError
+from models import Option
 from monitoring.constants import LOG_ADGSM
-from models import db, Option
+from monitoring.database import Session
 from time import sleep
 
 
@@ -25,8 +26,8 @@ class GSM(object):
         self._options = None
 
     def setup(self):
-        db_session = db.create_scoped_session()
-        section = db.session.query(Option).filter_by(name='notifications', section='gsm').first()
+        db_session = Session()
+        section = db_session.query(Option).filter_by(name='notifications', section='gsm').first()
         db_session.close()
 
         self._options = json.loads(section.value) if section else {'pin_code': ''}

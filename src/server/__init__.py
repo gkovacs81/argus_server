@@ -14,7 +14,9 @@ from flask.helpers import make_response
 from flask_sqlalchemy import SQLAlchemy
 from jose import jwt
 
+from models import *
 from monitoring.constants import ROLE_ADMIN, ROLE_USER, USER_TOKEN_EXPIRY
+from server.database import db
 from server.ipc import IPCClient
 from server.version import __version__
 from tools.clock import Clock
@@ -41,9 +43,8 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.use_reloader = False
 
 # avoid reloading records from database after session commit
-db = SQLAlchemy(app, session_options={"expire_on_commit": False})
+db.init_app(app)
 
-from models import *
 
 
 @app.route("/")
@@ -55,7 +56,7 @@ def root():
 def restrict_host(request_handler):
     @functools.wraps(request_handler)
     def _restrict_host(*args, **kws):
-        noip_config = Option.query.filter_by(name='network', section='dyndns').first()
+        noip_config = db.session.query(Option).filter_by(name='network', section='dyndns').first()
         if noip_config:
             noip_config = json.loads(noip_config.value)
 
@@ -185,7 +186,7 @@ def authenticate():
         app.logger.warn("User access from not the registered origin: %s != %s", device_token["ip"], request.environ["HTTP_ORIGIN"])
         return jsonify({"error": "invalid origin"}), 400
 
-    user = User.query.get(device_token["user_id"])
+    user = db.session.query(User).get(device_token["user_id"])
     if user and user.access_code == hash_code(request.json["access_code"]):
         return jsonify({
             "user_token": generate_user_token(user.name, user.role, request.environ["HTTP_ORIGIN"]),
@@ -204,7 +205,7 @@ def register_device():
     remote_address = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
     app.logger.debug("Input from '%s' on '%s': '%s'", remote_address, request.environ["HTTP_ORIGIN"], request.json)
     if request.json["registration_code"]:
-        user = User.query.filter_by(registration_code=hash_code(request.json["registration_code"].upper())).first()
+        user = db.session.query(User).filter_by(registration_code=hash_code(request.json["registration_code"].upper())).first()
 
         if user:
             if user.registration_expiry and dt.now(tzlocal()) > user.registration_expiry:
@@ -243,7 +244,7 @@ def register_device():
 @restrict_host
 def get_alerts():
     # app.logger.debug("Request: %s", request.args.get('alerting'))
-    return jsonify([i.serialize for i in Alert.query.order_by(Alert.start_time.desc())])
+    return jsonify([i.serialize for i in db.session.query(Alert).order_by(Alert.start_time.desc())])
 
 
 @app.route("/api/alert", methods=["GET"])
@@ -251,7 +252,7 @@ def get_alerts():
 @restrict_host
 def get_alert():
     alert = (
-        Alert.query.filter_by(end_time=None).order_by(Alert.start_time.desc()).first()
+        db.session.query(Alert).filter_by(end_time=None).order_by(Alert.start_time.desc()).first()
     )
     if alert:
         return jsonify(alert.serialize)
@@ -264,7 +265,7 @@ def get_alert():
 @restrict_host
 def users():
     if request.method == "GET":
-        return jsonify([i.serialize for i in User.query.order_by(User.role).all()])
+        return jsonify([i.serialize for i in db.session.query(User).order_by(User.role).all()])
     elif request.method == "POST":
         data = request.json
         user = User(name=data["name"], role=data["role"], access_code=data["accessCode"])
@@ -278,13 +279,13 @@ def users():
 @restrict_host
 def user(user_id):
     if request.method == "GET":
-        user = User.query.get(user_id)
+        user = db.session.query(User).get(user_id)
         if user:
             return jsonify(user.serialize)
 
         return make_response(jsonify({"error": "User not found"}), 404)
     elif request.method == "PUT":
-        user = User.query.get(user_id)
+        user = db.session.query(User).get(user_id)
         if user:
             if user.update(request.json):
                 db.session.commit()
@@ -294,7 +295,7 @@ def user(user_id):
 
         return make_response(jsonify({"error": "User not found"}), 404)
     elif request.method == "DELETE":
-        user = User.query.get(user_id)
+        user = db.session.query(User).get(user_id)
         if user:
             db.session.delete(user)
             db.session.commit()
@@ -314,7 +315,7 @@ def registration_code(user_id):
     app.logger.debug("Input from '%s' on '%s': '%s'", remote_address, request.environ.get("HTTP_ORIGIN", ""), request.json)
 
     if request.method == "GET":
-        user = User.query.get(user_id)
+        user = db.session.query(User).get(user_id)
         if user:
             if user.registration_code:
                 return make_response(jsonify({"error": "Already has registration code"}), 400)
@@ -326,7 +327,7 @@ def registration_code(user_id):
 
         return make_response(jsonify({"error": "User not found"}), 404)
     elif request.method == "DELETE":
-        user = User.query.get(user_id)
+        user = db.session.query(User).get(user_id)
         if user:
             user.registration_code = None
             user.registration_expiry = None
@@ -347,12 +348,12 @@ def view_sensors():
         return jsonify(
             [
                 i.serialize
-                for i in Sensor.query.filter_by(deleted=False).order_by(
+                for i in db.session.query(Sensor).filter_by(deleted=False).order_by(
                     Sensor.channel.asc()
                 )
             ]
         )
-    return jsonify([i.serialize for i in Sensor.query.filter_by(alert=True).all()])
+    return jsonify([i.serialize for i in db.session.query(Sensor).filter_by(alert=True).all()])
 
 
 @app.route("/api/sensors/", methods=["POST"])
@@ -360,8 +361,8 @@ def view_sensors():
 @restrict_host
 def create_sensor():
     data = request.json
-    zone = Zone.query.get(request.json["zoneId"])
-    sensor_type = SensorType.query.get(data["typeId"])
+    zone = db.session.query(Zone).get(request.json["zoneId"])
+    sensor_type = db.session.query(SensorType).get(data["typeId"])
     sensor = Sensor(
         channel=data["channel"],
         zone=zone,
@@ -379,7 +380,7 @@ def create_sensor():
 @restrict_host
 def sensors_reset_references():
     if request.method == "PUT":
-        for sensor in Sensor.query.all():
+        for sensor in db.session.query(Sensor).all():
             sensor.reference_value = None
 
         db.session.commit()
@@ -394,17 +395,17 @@ def sensors_reset_references():
 @restrict_host
 def sensor(sensor_id):
     if request.method == "GET":
-        sensor = Sensor.query.filter_by(id=sensor_id, deleted=False).first()
+        sensor = db.session.query(Sensor).filter_by(id=sensor_id, deleted=False).first()
         if sensor:
             return jsonify(sensor.serialize)
         return jsonify({"error": "Sensor not found"}), (404)
     elif request.method == "DELETE":
-        sensor = Sensor.query.get(sensor_id)
+        sensor = db.session.query(Sensor).get(sensor_id)
         sensor.deleted = True
         db.session.commit()
         return process_ipc_response(IPCClient().update_configuration())
     elif request.method == "PUT":
-        sensor = Sensor.query.get(sensor_id)
+        sensor = db.session.query(Sensor).get(sensor_id)
         if sensor:
             if sensor.update(request.json):
                 db.session.commit()
@@ -422,7 +423,7 @@ def sensor(sensor_id):
 @restrict_host
 def sensor_types():
     # app.logger.debug("Request: %s", request.args.get('alerting'))
-    return jsonify([i.serialize for i in SensorType.query.all()])
+    return jsonify([i.serialize for i in db.session.query(SensorType).all()])
 
 
 @app.route("/api/sensor/alert", methods=["GET"])
@@ -431,18 +432,18 @@ def sensor_types():
 def get_sensor_alert():
     if request.args.get("sensorId"):
         return jsonify(
-            Sensor.query.filter_by(id=request.args.get("sensorId"), alert=True).first()
+            db.session.query(Sensor).filter_by(id=request.args.get("sensorId"), alert=True).first()
             is not None
         )
     else:
-        return jsonify(Sensor.query.filter_by(alert=True).first() is not None)
+        return jsonify(db.session.query(Sensor).filter_by(alert=True).first() is not None)
 
 
 @app.route("/api/zones/", methods=["GET"])
 @authenticated(role=ROLE_USER)
 @restrict_host
 def get_zones():
-    return jsonify([i.serialize for i in Zone.query.filter_by(deleted=False).all()])
+    return jsonify([i.serialize for i in db.session.query(Zone).filter_by(deleted=False).all()])
 
 
 @app.route("/api/zones/", methods=["POST"])
@@ -464,13 +465,13 @@ def create_zone():
 @restrict_host
 def zone(zone_id):
     if request.method == "GET":
-        zone = Zone.query.get(zone_id)
+        zone = db.session.query(Zone).get(zone_id)
         if zone:
             return jsonify(zone.serialize)
 
         return make_response(jsonify({"error": "Zone not found"}), 404)
     elif request.method == "DELETE":
-        zone = Zone.query.get(zone_id)
+        zone = db.session.query(Zone).get(zone_id)
         if zone:
             zone.deleted = True
             db.session.commit()
@@ -478,7 +479,7 @@ def zone(zone_id):
 
         return make_response(jsonify({"error": "Zone not found"}), 404)
     elif request.method == "PUT":
-        zone = Zone.query.get(zone_id)
+        zone = db.session.query(Zone).get(zone_id)
         if zone:
             if zone.update(request.json):
                 db.session.commit()
@@ -524,13 +525,13 @@ def get_state():
 @restrict_host
 def option(option, section):
     if request.method == "GET":
-        db_option = Option.query.filter_by(name=option, section=section).first()
+        db_option = db.session.query(Option).filter_by(name=option, section=section).first()
         if db_option:
             return jsonify(db_option.serialize) if db_option else jsonify(None)
 
         return make_response(jsonify({"error": "Option not found"}), 404)
     elif request.method == "PUT":
-        db_option = Option.query.filter_by(name=option, section=section).first()
+        db_option = db.session.query(Option).filter_by(name=option, section=section).first()
         if not db_option:
             # create the new option
             db_option = Option(name=option, section=section, value="")
@@ -596,8 +597,8 @@ def set_clock():
 @authenticated(role=ROLE_USER)
 @restrict_host
 def get_keypads():
-    #return jsonify([i.serialize for i in Keypad.query.filter_by(deleted=False).all()])
-    return jsonify([i.serialize for i in Keypad.query.all()])
+    #return jsonify([i.serialize for i in db.session.query(Keypad).filter_by(deleted=False).all()])
+    return jsonify([i.serialize for i in db.session.query(Keypad).all()])
 
 
 @app.route("/api/keypad/<int:keypad_id>", methods=["GET", "PUT", "DELETE"])
@@ -608,13 +609,13 @@ def keypad(keypad_id):
     Limited to handle only one keypad!
     '''
     if request.method == "GET":
-        keypad = Keypad.query.first()
+        keypad = db.session.query(Keypad).first()
         if keypad:
             return jsonify(keypad.serialize)
         
         return make_response(jsonify({"error": "Option not found"}), 404 )
     elif request.method == "DELETE":
-        keypad = Keypad.query.get(keypad_id)
+        keypad = db.session.query(Keypad).get(keypad_id)
         if keypad:
             keypad.deleted = True
             db.session.commit()
@@ -622,10 +623,10 @@ def keypad(keypad_id):
 
         return make_response(jsonify({"error": "Option not found"}), 404)
     elif request.method == "PUT":
-        keypad = Keypad.query.get(keypad_id)
+        keypad = db.session.query(Keypad).get(keypad_id)
         if not keypad:
             # create the new keypad
-            keypad = Keypad(keypad_type=KeypadType.query.get(request.json["typeId"]))
+            keypad = Keypad(keypad_type=db.session.query(KeypadType).get(request.json["typeId"]))
 
         if keypad.update(request.json):
             db.session.commit()
@@ -641,7 +642,7 @@ def keypad(keypad_id):
 @restrict_host
 def keypadtypes():
     # app.logger.debug("Request: %s", request.args.get('alerting'))
-    return jsonify([i.serialize for i in KeypadType.query.all()])
+    return jsonify([i.serialize for i in db.session.query(KeypadType).all()])
 
 
 @app.route("/", defaults={"path": ""})

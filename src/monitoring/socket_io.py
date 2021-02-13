@@ -15,11 +15,14 @@ from urllib.parse import parse_qs, urlparse
 from jose import jwt
 import jose.exceptions
 
-from models import Option, db
+from models import Option
 from monitoring.constants import LOG_SOCKETIO
+from monitoring.database import Session
 
 
-noip_config = Option.query.filter_by(name='network', section='dyndns').first()
+session = Session()
+
+noip_config = session.query(Option).filter_by(name='network', section='dyndns').first()
 if noip_config:
     noip_config = json.loads(noip_config.value)
 

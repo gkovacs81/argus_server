@@ -7,9 +7,10 @@ from smtplib import SMTPException
 from threading import Thread
 from time import sleep
 
-from models import db, Option
+from models import Option
 from monitoring.constants import (LOG_NOTIFIER, MONITOR_STOP,
                                   MONITOR_UPDATE_CONFIG, THREAD_NOTIFIER)
+from monitoring.database import Session
 from monitoring.notifications.templates import (ALERT_STARTED_EMAIL,
                                                 ALERT_STARTED_SMS,
                                                 ALERT_STOPPED_EMAIL,
@@ -103,7 +104,7 @@ class Notifier(Thread):
         # Workaround to avoid hanging of keypad process on create_engine
         sleep(5)
         # --------------------------------------------------------------
-        self._db_session = db.create_scoped_session()
+        self._db_session = Session()
         self._options = self.get_options()
         self._logger.info("Subscription configuration: %s", self._options['subscriptions'])
 

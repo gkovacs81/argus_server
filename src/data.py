@@ -7,7 +7,9 @@ from sqlalchemy.exc import ProgrammingError
 
 from monitoring.constants import ROLE_ADMIN, ROLE_USER
 
-from models import db, Keypad, KeypadType, Sensor, SensorType, User, Zone
+from models import Keypad, KeypadType, Sensor, SensorType, User, Zone
+from monitoring.database import Session
+from models import metadata
 
 
 SENSOR_TYPES = [
@@ -17,42 +19,42 @@ SENSOR_TYPES = [
     SensorType(4, name='Break', description='Detect glass break')
 ]
 
+session = Session()
 
 def cleanup():
     print("Clean up database...")
-    meta = db.metadata
-    for table in reversed(meta.sorted_tables):
+    for table in reversed(metadata.sorted_tables):
         print(" - Clear table %s" % table)
         try:
-            db.session.execute(table.delete())
-            db.session.commit()
+            session.execute(table.delete())
+            session.commit()
         except ProgrammingError:
-            db.session.rollback()
+            session.rollback()
     print("Database is empty")
 
 
 def env_prod():
     admin_user = User(name="Administrator", role=ROLE_ADMIN, access_code="1234")
     admin_user.add_registration_code("ABCD1234")
-    db.session.add(admin_user)
+    session.add(admin_user)
     print(" - Created admin user")
 
-    db.session.add_all(SENSOR_TYPES)
+    session.add_all(SENSOR_TYPES)
     print(" - Created sensor types")
 
     kt1 = KeypadType(1, 'DSC', 'DSC keybus (DSC PC-1555RKZ)')
-    db.session.add_all([kt1])
+    session.add_all([kt1])
     print(" - Created keypad types")
 
     k1 = Keypad(keypad_type=kt1)
-    db.session.add_all([k1])
+    session.add_all([k1])
     print(" - Created keypads")
 
-    db.session.commit()
+    session.commit()
 
 
 def env_live_01():
-    db.session.add_all([
+    session.add_all([
         User(name="Administrator", role=ROLE_ADMIN, access_code="1234"),
         User(name="Chuck.Norris", role=ROLE_USER, access_code="1111")
     ])
@@ -64,10 +66,10 @@ def env_live_01():
     z4 = Zone(name="Stay", stay_delay=None, description="No alert when armed STAY")
     z5 = Zone(name="Away/Stay delayed", away_delay=40, stay_delay=20, description="Alert delayed when armed AWAY/STAY")
     z6 = Zone(name="Tamper", disarmed_delay=0, away_delay=None, stay_delay=None, description="Sabotage alert")
-    db.session.add_all([z1, z2, z3, z4, z5, z6])
+    session.add_all([z1, z2, z3, z4, z5, z6])
     print(" - Created zones")
 
-    db.session.add_all(SENSOR_TYPES)
+    session.add_all(SENSOR_TYPES)
     print(" - Created sensor types")
 
     s1 = Sensor(channel=0, sensor_type=SENSOR_TYPES[0], zone=z5, description="Garage")
@@ -78,24 +80,24 @@ def env_live_01():
     s6 = Sensor(channel=5, sensor_type=SENSOR_TYPES[0], zone=z4, description="Children's room")
     s7 = Sensor(channel=6, sensor_type=SENSOR_TYPES[0], zone=z4, description="Bedroom")
     s8 = Sensor(channel=7, sensor_type=SENSOR_TYPES[1], zone=z6, description="Tamper")
-    db.session.add_all([s1, s2, s3, s4, s5, s6, s7, s8])
+    session.add_all([s1, s2, s3, s4, s5, s6, s7, s8])
     print(" - Created sensors")
 
     kt1 = KeypadType(1, 'DSC', 'DSC keybus (DSC PC-1555RKZ)')
-    db.session.add_all([kt1])
+    session.add_all([kt1])
     print(" - Created keypad types")
 
     k1 = Keypad(keypad_type=kt1)
-    db.session.add_all([k1])
+    session.add_all([k1])
     print(" - Created keypads")
 
-    db.session.commit()
+    session.commit()
 
 
 def env_test_01():
     admin_user = User(name="Administrator", role=ROLE_ADMIN, access_code="1234")
     admin_user.add_registration_code("123")
-    db.session.add_all([
+    session.add_all([
         admin_user,
         User(name="Chuck Norris", role=ROLE_USER, access_code="1111")
     ])
@@ -106,27 +108,27 @@ def env_test_01():
     z3 = Zone(name="Away/stay delayed", away_delay=5, stay_delay=5, description="Alert delayed when armed AWAY or STAY")
     z4 = Zone(name="Stay delayed", stay_delay=5, description="Alert delayed when armed STAY")
     z5 = Zone(name="Stay", stay_delay=None, description="No alert when armed STAY")
-    db.session.add_all([z1, z2, z3, z4, z5])
+    session.add_all([z1, z2, z3, z4, z5])
     print(" - Created zones")
 
-    db.session.add_all(SENSOR_TYPES)
+    session.add_all(SENSOR_TYPES)
     print(" - Created sensor types")
 
     s1 = Sensor(channel=0, sensor_type=SENSOR_TYPES[0], zone=z3, description="Garage")
     s2 = Sensor(channel=1, sensor_type=SENSOR_TYPES[2], zone=z5, description="Test room")
     s3 = Sensor(channel=2, sensor_type=SENSOR_TYPES[1], zone=z2, description="Tamper")
-    db.session.add_all([s1, s2, s3])
+    session.add_all([s1, s2, s3])
     print(" - Created sensors")
 
     kt1 = KeypadType(1, 'DSC', 'DSC keybus (DSC PC-1555RKZ)')
-    db.session.add_all([kt1])
+    session.add_all([kt1])
     print(" - Created keypad types")
 
     k1 = Keypad(keypad_type=kt1)
-    db.session.add_all([k1])
+    session.add_all([k1])
     print(" - Created keypads")
 
-    db.session.commit()
+    session.commit()
 
 
 def main():

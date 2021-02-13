@@ -14,22 +14,24 @@ from pathlib import Path, PosixPath
 
 from pydbus import SystemBus
 
-from tools.dictionary import filter_keys
-from models import Option, db
+from models import Option
 from monitoring.constants import LOG_SC_CERTBOT
+from monitoring.database import Session
+from tools.dictionary import filter_keys
 
 
 class Certbot:
 
     def __init__(self, logger=None):
         self._logger = logger if logger else logging.getLogger(LOG_SC_CERTBOT)
+        self._db_session = Session()
 
     def generate_certificate(self):
         """
         Generate certbot certificates with dynamic dns provider
         """
         self._logger.info("Generating certbot certificate")
-        noip_config = Option.query.filter_by(name="network", section="dyndns").first()
+        noip_config = self._db_session.query(Option).filter_by(name="network", section="dyndns").first()
         if noip_config:
             noip_config = json.loads(noip_config.value)
         else:

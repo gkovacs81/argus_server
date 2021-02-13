@@ -12,9 +12,10 @@ from threading import Thread, Event
 from time import sleep
 from eventlet.queue import Empty
 
-from models import db, Alert, Sensor
+from models import Alert, Sensor
 import monitoring.alert
 
+from monitoring import storage
 from monitoring.adapters.power import PowerAdapter
 from monitoring.adapters.sensor import SensorAdapter
 from monitoring.constants import THREAD_MONITOR, LOG_MONITOR, MONITORING_STARTUP,\
@@ -22,9 +23,9 @@ from monitoring.constants import THREAD_MONITOR, LOG_MONITOR, MONITORING_STARTUP
     MONITOR_ARM_STAY, ARM_STAY, MONITOR_DISARM, MONITORING_READY,\
     MONITOR_UPDATE_CONFIG, MONITORING_UPDATING_CONFIG, MONITORING_INVALID_CONFIG,\
     MONITORING_SABOTAGE, ALERT_AWAY, ALERT_STAY, ALERT_SABOTAGE
+from monitoring.database import Session
 from monitoring.socket_io import send_system_state_change, send_sensors_state, \
     send_arm_state, send_alert_state, send_syren_state
-from monitoring import storage
 
 
 MEASUREMENT_CYCLES = 2
@@ -66,7 +67,7 @@ class Monitor(Thread):
 
     def run(self):
         self._logger.info('Monitoring started')
-        self._db_session = db.create_scoped_session()
+        self._db_session = Session()
 
         # wait some seconds to build up socket IO connection before emit messages
         sleep(5)

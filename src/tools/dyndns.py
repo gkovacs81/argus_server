@@ -6,11 +6,12 @@ import socket
 from copy import copy
 from ipaddress import ip_address
 
-import requests
 from noipy.main import execute_update
+import requests
+from socket import gaierror
 
-from _socket import gaierror
-from models import Option, db
+from models import Option
+from monitoring.database import Session
 from monitoring.constants import LOG_SC_DYNDNS
 from tools.dictionary import filter_keys
 
@@ -19,6 +20,7 @@ class DynDns:
 
     def __init__(self, logger=None):
         self._logger = logger if logger else logging.getLogger(LOG_SC_DYNDNS)
+        self._db_session= Session()
 
     def update_ip(self, force=False):
         '''
@@ -26,7 +28,7 @@ class DynDns:
         Update the IP address at DNSprovider if it's necesarry.
         :param force: force the update
         '''
-        noip_config = Option.query.filter_by(name='network', section='dyndns').first()
+        noip_config = self._db_session.query(Option).filter_by(name='network', section='dyndns').first()
         if noip_config:
             noip_config = json.loads(noip_config.value)
 
