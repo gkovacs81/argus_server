@@ -59,7 +59,7 @@ def restrict_host(request_handler):
         if noip_config:
             noip_config = json.loads(noip_config.value)
 
-        if noip_config.get("restrict_host", False):
+        if noip_config and noip_config.get("restrict_host", False):
             allowed_hostname = noip_config.get("hostname", None)
             actual_hostname = request.environ["HTTP_HOST"].split(':')[0]
             if allowed_hostname and allowed_hostname != actual_hostname:
@@ -311,7 +311,7 @@ def registration_code(user_id):
     app.logger.debug("Authenticating...")
     # check user credentials and return fake jwt token if valid
     remote_address = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
-    app.logger.debug("Input from '%s' on '%s': '%s'", remote_address, request.environ["HTTP_ORIGIN"], request.json)
+    app.logger.debug("Input from '%s' on '%s': '%s'", remote_address, request.environ.get("HTTP_ORIGIN", ""), request.json)
 
     if request.method == "GET":
         user = User.query.get(user_id)
