@@ -23,7 +23,7 @@ noip_config = Option.query.filter_by(name='network', section='dyndns').first()
 if noip_config:
     noip_config = json.loads(noip_config.value)
 
-if noip_config.get("restrict_host", False) and noip_config.get("hostname", None):
+if noip_config and noip_config.get("restrict_host", False) and noip_config.get("hostname", None):
     allowed_origins = f"https://{noip_config['hostname']}"
 else:
     allowed_origins = "*"
