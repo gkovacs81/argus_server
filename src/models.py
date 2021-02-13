@@ -249,8 +249,8 @@ class User(BaseModel):
     role = db.Column(db.String(12), nullable=False)
     registration_code = db.Column(db.String(REGISTRATION_CODE_LENGTH), unique=True, nullable=True)
     registration_expiry = db.Column(db.DateTime(timezone=True))
-    access_code = db.Column(db.String, unique=False, nullable=False)
-    fourkey_code = db.Column(db.String(4), nullable=False)
+    access_code = db.Column(db.String(64), unique=False, nullable=False)
+    fourkey_code = db.Column(db.String(64), nullable=False)
     comment = db.Column(db.String, nullable=True)
 
     def __init__(self, name, role, access_code, fourkey_code=None):
