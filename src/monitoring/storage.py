@@ -10,6 +10,10 @@ In memory storage for communicating between threads
 
 _data = dict()
 
+ARM_STATE = 0
+MONITORING_STATE = 1
+POWER_STATE = 2
+
 def get(key):
     return _data[key]
 

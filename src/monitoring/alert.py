@@ -52,7 +52,7 @@ class SensorAlert(Thread):
             SyrenAlert.start_syren(self._alert_type, SensorAlert._sensor_queue, self._stop_event)
             SensorAlert._sensor_queue.put(self._sensor_id)
             if self._alert_type == ALERT_SABOTAGE:
-                storage.set("state", MONITORING_SABOTAGE)
+                storage.set(storage.MONITORING_STATE, MONITORING_SABOTAGE)
                 send_system_state_change(MONITORING_SABOTAGE)
         else:
             self._logger.info("Sensor alert stopped")

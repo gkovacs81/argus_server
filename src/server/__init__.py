@@ -1,5 +1,3 @@
-import functools
-import json
 import logging
 import os
 import re
@@ -14,9 +12,11 @@ from jose import jwt
 
 from models import Alert, Keypad, KeypadType, Option, Sensor, SensorType, User, Zone, hash_code
 from monitoring.constants import ROLE_USER
+from server.blueprints.power import power
 from server.database import db
 from server.decorators import authenticated, generate_user_token, registered, restrict_host
 from server.ipc import IPCClient
+from server.tools import process_ipc_response
 from server.version import __version__
 from tools.clock import Clock
 
@@ -25,6 +25,7 @@ argus_application_folder = os.path.join(
 )
 
 app = Flask(__name__)
+app.register_blueprint(power)
 
 if __name__ != 'server':
     gunicorn_logger = logging.getLogger('gunicorn.error')
@@ -48,7 +49,6 @@ app.use_reloader = False
 
 # avoid reloading records from database after session commit
 db.init_app(app)
-
 
 
 @app.route("/")
@@ -585,12 +585,6 @@ def catch_all(path):
     return send_from_directory(argus_application_folder, "index.html")
 
 
-def process_ipc_response(response):
-    if response:
-        if response['result']:
-            return jsonify(response.get('value'))
-        else:
-            return make_response(jsonify({'message': response['message']}), 500)
-    else:
-        return make_response(jsonify({'message': 'No response from monitoring service'}), 503)
+
+
 

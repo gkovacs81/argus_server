@@ -9,11 +9,10 @@ import socket
 from os import environ
 
 from monitoring.constants import (ARM_AWAY, ARM_STAY, MONITOR_ARM_AWAY,
-                                  MONITOR_ARM_STAY, MONITOR_DISARM,
+                                  MONITOR_ARM_STAY, MONITOR_DISARM, POWER_GET_STATE,
                                   MONITOR_SET_CLOCK, MONITOR_SYNC_CLOCK,
                                   MONITOR_UPDATE_CONFIG, MONITOR_UPDATE_SECURE_CONNECTION,
-                                  MONITOR_UPDATE_KEYPAD, MONITORING_ERROR,
-                                  MONITOR_GET_STATE, MONITOR_GET_ARM)
+                                  MONITOR_UPDATE_KEYPAD, MONITOR_GET_STATE, MONITOR_GET_ARM)
 
 
 class IPCClient(object):
@@ -55,6 +54,11 @@ class IPCClient(object):
     def get_state(self):
         return self._send_message({
             'action': MONITOR_GET_STATE
+        })
+
+    def get_power_state(self):
+        return self._send_message({
+            'action': POWER_GET_STATE
         })
 
     def update_configuration(self):

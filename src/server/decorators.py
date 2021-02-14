@@ -45,7 +45,7 @@ def registered(request_handler):
     @functools.wraps(request_handler)
     def _registered(*args, **kws):
         auth_header = request.headers.get("Authorization")
-        logger.info("Header: %s", auth_header)
+        logger.debug("Header: %s", auth_header)
         raw_token = auth_header.split(" ")[1] if auth_header else ""
         if raw_token:
             try:
@@ -78,7 +78,7 @@ def authenticated(role=ROLE_ADMIN):
         @functools.wraps(request_handler)
         def check_access(*args, **kws):
             auth_header = request.headers.get("Authorization")
-            logger.info("Header: %s", auth_header)
+            logger.debug("Header: %s", auth_header)
             remote_address = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
             logger.debug("Input from '%s': '%s'", remote_address, request.json)
 

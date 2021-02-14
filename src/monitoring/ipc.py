@@ -11,7 +11,7 @@ from threading import Thread
 
 from monitoring import storage
 from monitoring.constants import (LOG_IPC, MONITOR_ARM_AWAY, MONITOR_ARM_STAY,
-                                  MONITOR_DISARM, MONITOR_SET_CLOCK,
+                                  MONITOR_DISARM, POWER_GET_STATE, MONITOR_SET_CLOCK,
                                   MONITOR_SYNC_CLOCK, MONITOR_UPDATE_CONFIG,
                                   MONITOR_UPDATE_SECURE_CONNECTION, MONITOR_UPDATE_KEYPAD,
                                   THREAD_IPC, MONITOR_GET_ARM, MONITOR_GET_STATE)
@@ -85,9 +85,9 @@ class IPCServer(Thread):
             self._logger.info("Action: disarm")
             self._broadcaster.send_message(MONITOR_DISARM)
         elif message["action"] == MONITOR_GET_ARM:
-            return_value["value"] = {"type": storage.get("arm")}
+            return_value["value"] = {"type": storage.get(storage.ARM_STATE)}
         elif message["action"] == MONITOR_GET_STATE:
-            return_value["value"] = {"state": storage.get("state")}
+            return_value["value"] = {"state": storage.get(storage.MONITORING_STATE)}
         elif message["action"] == MONITOR_UPDATE_CONFIG:
             self._logger.info("Update configuration...")
             self._broadcaster.send_message(MONITOR_UPDATE_CONFIG)
@@ -105,6 +105,11 @@ class IPCServer(Thread):
             if not Clock().set_clock(message):
                 return_value["result"] = False
                 return_value["message"] = "Failed to update date/time and zone"
+        elif message["action"] == POWER_GET_STATE:
+            return_value["value"] = {"state": storage.get(storage.POWER_STATE)}
+        else:
+            return_value["result"] = False
+            return_value["message"] = "Unknown command"
 
         return return_value
 

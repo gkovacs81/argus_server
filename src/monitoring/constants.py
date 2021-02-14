@@ -63,6 +63,8 @@ MONITOR_STOP = 'monitor_stop'
 MONITOR_SYNC_CLOCK = 'monitor_sync_clock'
 MONITOR_SET_CLOCK = 'monitor_set_clock'
 
+POWER_GET_STATE = 'power_get_state'
+
 '''---------------------------------------------------------------'''
 # CONSTANTS USED ALSO BY THE WEB APPLICATION
 
@@ -87,6 +89,9 @@ MONITORING_INVALID_CONFIG = 'monitoring_invalid_config'
 MONITORING_ARMED = 'monitoring_armed'
 MONITORING_SABOTAGE = 'monitoring_sabotage'
 MONITORING_ERROR = 'monitoring_error'
+
+POWER_SOURCE_NETWORK = 'network'
+POWER_SOURCE_BATTERY = 'battery'
 
 ROLE_ADMIN = 'admin'
 ROLE_USER = 'user'
