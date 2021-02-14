@@ -5,18 +5,17 @@ import os
 import re
 from datetime import datetime as dt
 from os.path import isfile, join
-from urllib.parse import urlparse
 
 import jose.exceptions
-from dateutil.tz import UTC, tzlocal
+from dateutil.tz import tzlocal
 from flask import Flask, jsonify, request, send_from_directory
 from flask.helpers import make_response
-from flask_sqlalchemy import SQLAlchemy
 from jose import jwt
 
-from models import *
-from monitoring.constants import ROLE_ADMIN, ROLE_USER, USER_TOKEN_EXPIRY
+from models import Alert, Keypad, KeypadType, Option, Sensor, SensorType, User, Zone, hash_code
+from monitoring.constants import ROLE_USER
 from server.database import db
+from server.decorators import authenticated, generate_user_token, registered, restrict_host
 from server.ipc import IPCClient
 from server.version import __version__
 from tools.clock import Clock
@@ -25,9 +24,14 @@ argus_application_folder = os.path.join(
     os.getcwd(), os.environ.get("SERVER_STATIC_FOLDER", "")
 )
 
-# app = Flask(__name__, static_folder=argus_application_folder, static_url_path='/')
 app = Flask(__name__)
-# app.logger.debug("App folder: %s", argus_application_folder)
+
+if __name__ != 'server':
+    gunicorn_logger = logging.getLogger('gunicorn.error')
+    app.logger.handlers = gunicorn_logger.handlers
+    app.logger.setLevel(gunicorn_logger.level)
+
+app.logger.debug("App folder: %s", argus_application_folder)
 
 POSTGRES = {
     "user": os.environ.get("DB_USER", None),
@@ -53,112 +57,6 @@ def root():
     return send_from_directory(argus_application_folder, "index.html")
 
 
-def restrict_host(request_handler):
-    @functools.wraps(request_handler)
-    def _restrict_host(*args, **kws):
-        noip_config = db.session.query(Option).filter_by(name='network', section='dyndns').first()
-        if noip_config:
-            noip_config = json.loads(noip_config.value)
-
-        if noip_config and noip_config.get("restrict_host", False):
-            allowed_hostname = noip_config.get("hostname", None)
-            actual_hostname = request.environ["HTTP_HOST"].split(':')[0]
-            if allowed_hostname and allowed_hostname != actual_hostname:
-                app.logger.warn("Not allowed host (%s) != %s", allowed_hostname, actual_hostname)
-                # don't use tuple as a response to avoid exception using multiple decorators
-                response = jsonify({"error": "host not allowed"})
-                response.status_code = 401
-                return response
-
-        return request_handler(*args, **kws)
-
-    return _restrict_host
-
-
-def registered(request_handler):
-    @functools.wraps(request_handler)
-    def _registered(*args, **kws):
-        auth_header = request.headers.get("Authorization")
-        # app.logger.info("Header: %s", auth_header)
-        raw_token = auth_header.split(" ")[1] if auth_header else ""
-        if raw_token:
-            # app.logger.info("Token: %s", token)
-            try:
-                token = jwt.decode(raw_token, os.environ.get("SECRET"), algorithms="HS256")
-                return request_handler(*args, **kws)
-            except jose.exceptions.JWTError:
-                app.logger.warn("Bad token (%s) from %s", raw_token, request.remote_addr)
-                return jsonify({"error": "operation not permitted (wrong token)"}), 403
-        else:
-            app.logger.info("Request without authentication info from %s", request.remote_addr)
-            return jsonify({"error": "operation not permitted (missing token)"}), 403
-
-    return _registered
-
-
-def generate_user_token(name, role, origin):
-    token = {
-        "name": name,
-        "role": role,
-        "origin": origin,
-        "timestamp": int(dt.now(tz=UTC).timestamp())
-    }
-
-    return jwt.encode(token, os.environ.get("SECRET"), algorithm="HS256")
-
-
-def authenticated(role=ROLE_ADMIN):
-    def _authenticated(request_handler):
-        @functools.wraps(request_handler)
-        def check_access(*args, **kws):
-            auth_header = request.headers.get("Authorization")
-            # app.logger.info("Header: %s", auth_header)
-            remote_address = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
-            # app.logger.debug("Input from '%s': '%s'", remote_address, request.json)
-
-            raw_token = auth_header.split(" ")[1] if auth_header else ""
-            if raw_token:
-                # app.logger.info("Token: %s", token)
-                try:
-                    token = jwt.decode(raw_token, os.environ.get("SECRET"), algorithms="HS256")
-                    if int(token["timestamp"]) < int(dt.now(tz=UTC).timestamp()) - USER_TOKEN_EXPIRY:
-                        return jsonify({"error": "token expired"}), 401
-
-                    # HTTP_ORIGIN is not always sent
-                    referer = urlparse(request.environ["HTTP_REFERER"])
-                    origin = urlparse(token["origin"])
-
-                    if origin.scheme != referer.scheme or origin.netloc != referer.netloc:
-                        return jsonify({"error": f"invalid origin {origin} <> {referer}"}), 401
-
-                    if (role == ROLE_USER and token["role"] not in (ROLE_USER, ROLE_ADMIN)) or \
-                       (role == ROLE_ADMIN and token["role"] not in (ROLE_ADMIN,)):
-                        app.logger.info(
-                            "Operation %s not permitted for user='%s/%s' from %s",
-                            request,
-                            token["name"],
-                            token["role"],
-                            token["origin"],
-                            remote_address
-                        )
-                        return jsonify({"error": "operation not permitted (role)"}), 403
-
-                    response = request_handler(*args, **kws)
-                    # generate new user token to extend the user session
-                    response.headers["User-Token"] = generate_user_token(token["name"], token["role"], f"{origin.scheme}://{origin.netloc}")
-                    return response
-                except jose.exceptions.JWTError:
-                    app.logger.warn("Bad token (%s) from %s", raw_token, remote_address)
-                    return jsonify({"error": "operation not permitted (wrong token)"}), 403
-            else:
-                app.logger.warn("Request without authentication info from %s", remote_address)
-                return jsonify({"error": "operation not permitted (missing token)"}), 403
-
-        return check_access
-
-    return _authenticated
-
-
 @app.errorhandler(AssertionError)
 def handle_validation_errors(error):
     return jsonify({'error': str(error)}), 400
@@ -167,7 +65,7 @@ def handle_validation_errors(error):
 @app.route("/api/authenticate", methods=["POST"])
 @restrict_host
 def authenticate():
-    # app.logger.debug("Authenticating...")
+    app.logger.debug("Authenticating...")
     try:
         device_token = jwt.decode(request.json["device_token"], os.environ.get("SECRET"), algorithms="HS256")
     except jose.exceptions.JWTError:
@@ -243,7 +141,6 @@ def register_device():
 @authenticated(role=ROLE_USER)
 @restrict_host
 def get_alerts():
-    # app.logger.debug("Request: %s", request.args.get('alerting'))
     return jsonify([i.serialize for i in db.session.query(Alert).order_by(Alert.start_time.desc())])
 
 
@@ -343,7 +240,7 @@ def registration_code(user_id):
 @authenticated(role=ROLE_USER)
 @restrict_host
 def view_sensors():
-    # app.logger.debug("Request: %s", request.args.get('alerting'))
+    app.logger.debug("Request->alerting: %s", request.args.get('alerting'))
     if not request.args.get("alerting"):
         return jsonify(
             [
@@ -422,7 +319,6 @@ def sensor(sensor_id):
 @authenticated(role=ROLE_USER)
 @restrict_host
 def sensor_types():
-    # app.logger.debug("Request: %s", request.args.get('alerting'))
     return jsonify([i.serialize for i in db.session.query(SensorType).all()])
 
 
@@ -641,7 +537,6 @@ def keypad(keypad_id):
 @authenticated()
 @restrict_host
 def keypadtypes():
-    # app.logger.debug("Request: %s", request.args.get('alerting'))
     return jsonify([i.serialize for i in db.session.query(KeypadType).all()])
 
 
@@ -649,13 +544,13 @@ def keypadtypes():
 @app.route("/<path:path>")
 @restrict_host
 def catch_all(path):
-    # app.logger.debug("Working in: %s", os.environ.get('SERVER_STATIC_FOLDER', ''))
-    # app.logger.debug("FALLBACK for path: %s", path)
+    app.logger.debug("Working in: %s", os.environ.get('SERVER_STATIC_FOLDER', ''))
+    app.logger.debug("FALLBACK for path: %s", path)
 
     # check compression
     compress = os.environ["COMPRESS"].lower() == "true"
     if compress and (path.endswith(".js") or path.endswith(".css")):
-        # app.logger.debug("Use compression")
+        app.logger.debug("Use compression")
         path += ".gz"
     else:
         compress = False
@@ -665,28 +560,28 @@ def catch_all(path):
     result = re.search("(" + "|".join(languages) + ")", path)
     language = result.group(0) if result else ""
 
-    # app.logger.debug("Language: %s from %s", language if language else "No language in URL", languages)
+    app.logger.debug("Language: %s from %s", language if language else "No language in URL", languages)
     if language == "en":
         path = path.replace("en/", "")
 
-    # app.logger.debug("FALLBACK for path processed: %s", path)
+    app.logger.debug("FALLBACK for path processed: %s", path)
 
     # return with file if exists
-    # app.logger.debug("Checking for %s", path)
+    app.logger.debug("Checking for %s", path)
     if isfile(join(argus_application_folder, path)):
-        # app.logger.debug("Path exists without language: %s", path)
+        app.logger.debug("Path exists without language: %s", path)
         response = send_from_directory(argus_application_folder, path)
         if compress:
             response.headers["Content-Encoding"] = "gzip"
         return response
     elif language and isfile(join(argus_application_folder, language, "index.html")):
-        # app.logger.debug("Path exists with language: %s",join(language, 'index.html'))
+        app.logger.debug("Path exists with language: %s",join(language, 'index.html'))
         return send_from_directory(
             join(argus_application_folder, language), "index.html"
         )
 
     # or return with the index file
-    # app.logger.debug("INDEX without language: %s", join(language, 'index.html'))
+    app.logger.debug("INDEX without language: %s", join(language, 'index.html'))
     return send_from_directory(argus_application_folder, "index.html")
 
 
@@ -699,8 +594,3 @@ def process_ipc_response(response):
     else:
         return make_response(jsonify({'message': 'No response from monitoring service'}), 503)
 
-
-if __name__ != "__main__":
-    gunicorn_logger = logging.getLogger("gunicorn.error")
-    app.logger.handlers = gunicorn_logger.handlers
-    app.logger.setLevel(gunicorn_logger.level)
