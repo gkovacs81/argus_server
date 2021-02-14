@@ -529,7 +529,7 @@ def option(option, section):
         if db_option:
             return jsonify(db_option.serialize) if db_option else jsonify(None)
 
-        return make_response(jsonify({"error": "Option not found"}), 404)
+        return make_response(jsonify({}), 200)
     elif request.method == "PUT":
         db_option = db.session.query(Option).filter_by(name=option, section=section).first()
         if not db_option:
