@@ -14,6 +14,7 @@ from monitoring.monitor import Monitor
 from monitoring.notifications.notifier import Notifier
 from monitoring.socket_io import start_socketio
 from server.broadcast import Broadcaster
+from tools.ssh import SSH
 
 
 def initialize_logging():
@@ -47,6 +48,7 @@ def createPidFile():
 def start():
     createPidFile()
     initialize_logging()
+    SSH().update_ssh_service()
 
     logger = logging.getLogger(LOG_SERVICE)
 

@@ -13,10 +13,11 @@ from monitoring import storage
 from monitoring.constants import (LOG_IPC, MONITOR_ARM_AWAY, MONITOR_ARM_STAY,
                                   MONITOR_DISARM, POWER_GET_STATE, MONITOR_SET_CLOCK,
                                   MONITOR_SYNC_CLOCK, MONITOR_UPDATE_CONFIG,
-                                  MONITOR_UPDATE_SECURE_CONNECTION, MONITOR_UPDATE_KEYPAD,
-                                  THREAD_IPC, MONITOR_GET_ARM, MONITOR_GET_STATE)
+                                  UPDATE_SECURE_CONNECTION, MONITOR_UPDATE_KEYPAD,
+                                  THREAD_IPC, MONITOR_GET_ARM, MONITOR_GET_STATE, UPDATE_SSH)
 from tools.clock import Clock
 from tools.connection import SecureConnection
+from tools.ssh import SSH
 
 MONITOR_INPUT_SOCKET = environ["MONITOR_INPUT_SOCKET"]
 
@@ -94,9 +95,12 @@ class IPCServer(Thread):
         elif message["action"] == MONITOR_UPDATE_KEYPAD:
             self._logger.info("Update keypad...")
             self._broadcaster.send_message(MONITOR_UPDATE_KEYPAD)
-        elif message["action"] == MONITOR_UPDATE_SECURE_CONNECTION:
+        elif message["action"] == UPDATE_SECURE_CONNECTION:
             self._logger.info("Update secure connection...")
             SecureConnection(self._stop_event).run()
+        elif message["action"] == UPDATE_SSH:
+            self._logger.info("Update ssh connection...")
+            SSH().update_ssh_service()
         elif message["action"] == MONITOR_SYNC_CLOCK:
             if not Clock().sync_clock():
                 return_value["result"] = False

@@ -30,6 +30,7 @@ LOG_ADKEYPAD   = 'AD.Keypad'
 LOG_SECCON     = THREAD_SECCON
 LOG_SC_CERTBOT = 'SC.CertBot'
 LOG_SC_DYNDNS  = 'SC.DynDns'
+LOG_SC_ACCESS  = 'SC.Access'
 LOG_CLOCK      = 'Clock'
 
 LOGGING_MODULES = [
@@ -46,6 +47,7 @@ LOGGING_MODULES = [
     (LOG_SECCON, INFO),
     (LOG_SC_CERTBOT, INFO),
     (LOG_SC_DYNDNS, INFO),
+    (LOG_SC_ACCESS, INFO),
     (LOG_CLOCK, INFO)
 ]
 
@@ -58,12 +60,13 @@ MONITOR_GET_STATE = 'monitor_get_state'
 MONITOR_GET_ARM = 'monitor_get_arm'
 MONITOR_UPDATE_CONFIG = 'monitor_update_config'
 MONITOR_UPDATE_KEYPAD = 'monitor_update_keypad'
-MONITOR_UPDATE_SECURE_CONNECTION = 'monitor_update_secure_connection'
 MONITOR_STOP = 'monitor_stop'
 MONITOR_SYNC_CLOCK = 'monitor_sync_clock'
 MONITOR_SET_CLOCK = 'monitor_set_clock'
 
+UPDATE_SECURE_CONNECTION = 'monitor_update_secure_connection'
 POWER_GET_STATE = 'power_get_state'
+UPDATE_SSH = 'update_ssh'
 
 '''---------------------------------------------------------------'''
 # CONSTANTS USED ALSO BY THE WEB APPLICATION

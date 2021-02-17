@@ -443,6 +443,9 @@ def option(option, section):
         elif db_option.name == "network" and db_option.section == "dyndns":
             if os.environ.get("ARGUS_DEVELOPMENT", "0") == "0":
                 return process_ipc_response(IPCClient().update_dyndns())
+        elif db_option.name == "network" and db_option.section == "access":
+            if os.environ.get("ARGUS_DEVELOPMENT", "0") == "0":
+                return process_ipc_response(IPCClient().update_ssh())
 
         return make_response('', 204)
 
