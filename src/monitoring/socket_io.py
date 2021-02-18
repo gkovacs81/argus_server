@@ -109,7 +109,7 @@ def send_syren_state(syren_state):
 def send_system_state_change(system_state):
     send_message("system_state_change", system_state)
 
-def send_system_state_change(power_state):
+def send_power_state_change(power_state):
     send_message("power_state_change", power_state)
 
 

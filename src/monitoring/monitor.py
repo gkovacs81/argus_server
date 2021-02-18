@@ -24,7 +24,7 @@ from monitoring.constants import POWER_SOURCE_BATTERY, POWER_SOURCE_NETWORK, THR
     MONITOR_UPDATE_CONFIG, MONITORING_UPDATING_CONFIG, MONITORING_INVALID_CONFIG,\
     MONITORING_SABOTAGE, ALERT_AWAY, ALERT_STAY, ALERT_SABOTAGE
 from monitoring.database import Session
-from monitoring.socket_io import send_system_state_change, send_sensors_state, \
+from monitoring.socket_io import send_power_state_change, send_system_state_change, send_sensors_state, \
     send_arm_state, send_alert_state, send_syren_state
 
 
@@ -78,6 +78,7 @@ class Monitor(Thread):
         # initialize state
         send_alert_state(None)
         send_syren_state(None)
+        storage.set(storage.ARM_STATE, ARM_DISARM)
         send_arm_state(ARM_DISARM)
 
         self.load_sensors()
@@ -136,11 +137,11 @@ class Monitor(Thread):
         
         if new_power_source == PowerAdapter.SOURCE_BATTERY and \
                 self._power_source == PowerAdapter.SOURCE_NETWORK:
-            send_system_state_change(POWER_SOURCE_BATTERY)
+            send_power_state_change(POWER_SOURCE_BATTERY)
             self._logger.info("Power outage started!")
         elif new_power_source == PowerAdapter.SOURCE_NETWORK and \
                 self._power_source == PowerAdapter.SOURCE_BATTERY:
-            send_system_state_change(POWER_SOURCE_NETWORK)
+            send_power_state_change(POWER_SOURCE_NETWORK)
             self._logger.info("Power outage ended!")
 
         self._power_source = new_power_source
@@ -161,8 +162,8 @@ class Monitor(Thread):
     def load_sensors(self):
         '''Load the sensors from the db in the thread to avoid session problems'''
         storage.set(storage.MONITORING_STATE, MONITORING_UPDATING_CONFIG)
-        send_sensors_state(None)
         send_system_state_change(MONITORING_UPDATING_CONFIG)
+        send_sensors_state(None)
 
         # TODO: wait a little bit to see status for debug
         sleep(3)
