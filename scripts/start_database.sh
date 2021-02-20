@@ -9,10 +9,6 @@ source etc/common.$1.env
 source etc/monitor.$1.env
 source etc/secrets.env
 
-source scripts/install.sh
-
-. ./$PYENV/bin/activate
-
 docker volume create argus-$1
 docker start argus-$1 || docker run -d -it \
     --name argus-$1 \
