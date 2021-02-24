@@ -25,8 +25,8 @@ stringcase = "==1.2.0"
 
 [dev-packages]
 flake8 = "*"
-autopep8 = "*"
 rope = "*"
+black = "*"
 
 [requires]
 python_version = "3.8"

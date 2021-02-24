@@ -11,10 +11,15 @@ import models
 from models import Keypad, User, hash_code
 from monitoring.adapters.keypads.base import KeypadBase
 from monitoring.adapters.mock.keypad import MockKeypad
-from monitoring.constants import (LOG_ADKEYPAD, MONITOR_ARM_AWAY,
-                                  MONITOR_ARM_STAY, MONITOR_DISARM,
-                                  MONITOR_STOP, MONITOR_UPDATE_KEYPAD,
-                                  THREAD_KEYPAD)
+from monitoring.constants import (
+    LOG_ADKEYPAD,
+    MONITOR_ARM_AWAY,
+    MONITOR_ARM_STAY,
+    MONITOR_DISARM,
+    MONITOR_STOP,
+    MONITOR_UPDATE_KEYPAD,
+    THREAD_KEYPAD,
+)
 
 if os.uname()[4][:3] == "arm":
     from monitoring.adapters.keypads.dsc import DSCKeypad

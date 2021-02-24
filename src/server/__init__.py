@@ -20,15 +20,13 @@ from server.tools import process_ipc_response
 from server.version import __version__
 from tools.clock import Clock
 
-argus_application_folder = os.path.join(
-    os.getcwd(), os.environ.get("SERVER_STATIC_FOLDER", "")
-)
+argus_application_folder = os.path.join(os.getcwd(), os.environ.get("SERVER_STATIC_FOLDER", ""))
 
 app = Flask(__name__)
 app.register_blueprint(power)
 
-if __name__ != 'server':
-    gunicorn_logger = logging.getLogger('gunicorn.error')
+if __name__ != "server":
+    gunicorn_logger = logging.getLogger("gunicorn.error")
     app.logger.handlers = gunicorn_logger.handlers
     app.logger.setLevel(gunicorn_logger.level)
 
@@ -41,9 +39,7 @@ POSTGRES = {
     "host": os.environ.get("DB_HOST", None),
     "port": os.environ.get("DB_PORT", None),
 }
-app.config["SQLALCHEMY_DATABASE_URI"] = (
-    "postgresql://%(user)s:%(pw)s@%(host)s:%(port)s/%(db)s" % POSTGRES
-)
+app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://%(user)s:%(pw)s@%(host)s:%(port)s/%(db)s" % POSTGRES
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.use_reloader = False
 
@@ -59,7 +55,7 @@ def root():
 
 @app.errorhandler(AssertionError)
 def handle_validation_errors(error):
-    return jsonify({'error': str(error)}), 400
+    return jsonify({"error": str(error)}), 400
 
 
 @app.route("/api/authenticate", methods=["POST"])
@@ -76,19 +72,23 @@ def authenticate():
         return jsonify({"error": "missing device token"}), 400
 
     # TODO: the client IP can change for mobile devices!?
-    remote_address = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
+    remote_address = request.environ.get("HTTP_X_REAL_IP", request.remote_addr)
     if device_token["ip"] != remote_address:
         app.logger.warn("User access from not the registered IP: %s != %s", device_token["ip"], remote_address)
 
     if device_token["origin"] != request.environ["HTTP_ORIGIN"]:
-        app.logger.warn("User access from not the registered origin: %s != %s", device_token["ip"], request.environ["HTTP_ORIGIN"])
+        app.logger.warn(
+            "User access from not the registered origin: %s != %s", device_token["ip"], request.environ["HTTP_ORIGIN"]
+        )
         return jsonify({"error": "invalid origin"}), 400
 
     user = db.session.query(User).get(device_token["user_id"])
     if user and user.access_code == hash_code(request.json["access_code"]):
-        return jsonify({
-            "user_token": generate_user_token(user.name, user.role, request.environ["HTTP_ORIGIN"]),
-        })
+        return jsonify(
+            {
+                "user_token": generate_user_token(user.name, user.role, request.environ["HTTP_ORIGIN"]),
+            }
+        )
     elif not user:
         return jsonify({"error": "invalid user id"}), 400
 
@@ -100,41 +100,29 @@ def authenticate():
 def register_device():
     app.logger.debug("Authenticating...")
 
-    remote_address = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
+    remote_address = request.environ.get("HTTP_X_REAL_IP", request.remote_addr)
     app.logger.debug("Input from '%s' on '%s': '%s'", remote_address, request.environ["HTTP_ORIGIN"], request.json)
     if request.json["registration_code"]:
-        user = db.session.query(User).filter_by(registration_code=hash_code(request.json["registration_code"].upper())).first()
+        user = (
+            db.session.query(User)
+            .filter_by(registration_code=hash_code(request.json["registration_code"].upper()))
+            .first()
+        )
 
         if user:
             if user.registration_expiry and dt.now(tzlocal()) > user.registration_expiry:
-                return make_response(jsonify({
-                    "error": "Failed to register device",
-                    "reason": "Expired registration code"}),
-                    400
+                return make_response(
+                    jsonify({"error": "Failed to register device", "reason": "Expired registration code"}), 400
                 )
 
             user.registration_code = None
             db.session.commit()
-            token = {
-                "ip": remote_address,
-                "origin": request.environ["HTTP_ORIGIN"],
-                "user_id": user.id
-            }
-            return jsonify({
-                "device_token": jwt.encode(token, os.environ.get("SECRET"), algorithm="HS256")
-            })
+            token = {"ip": remote_address, "origin": request.environ["HTTP_ORIGIN"], "user_id": user.id}
+            return jsonify({"device_token": jwt.encode(token, os.environ.get("SECRET"), algorithm="HS256")})
         else:
-            return make_response(jsonify({
-                "error": "Failed to register device",
-                "reason": "User not found"}),
-                400
-            )
+            return make_response(jsonify({"error": "Failed to register device", "reason": "User not found"}), 400)
 
-    return make_response(jsonify({
-        "error": "Failed to register device",
-        "reason": "Missing registration code"}),
-        400
-    )
+    return make_response(jsonify({"error": "Failed to register device", "reason": "Missing registration code"}), 400)
 
 
 @app.route("/api/alerts", methods=["GET"])
@@ -148,9 +136,7 @@ def get_alerts():
 @registered
 @restrict_host
 def get_alert():
-    alert = (
-        db.session.query(Alert).filter_by(end_time=None).order_by(Alert.start_time.desc()).first()
-    )
+    alert = db.session.query(Alert).filter_by(end_time=None).order_by(Alert.start_time.desc()).first()
     if alert:
         return jsonify(alert.serialize)
     else:
@@ -171,6 +157,7 @@ def users():
 
     return jsonify(None)
 
+
 @app.route("/api/user/<int:user_id>", methods=["GET", "PUT", "DELETE"])
 @authenticated()
 @restrict_host
@@ -188,7 +175,7 @@ def user(user_id):
                 db.session.commit()
                 return jsonify(None)
             else:
-                return make_response('', 204)
+                return make_response("", 204)
 
         return make_response(jsonify({"error": "User not found"}), 404)
     elif request.method == "DELETE":
@@ -202,14 +189,17 @@ def user(user_id):
 
     return make_response(jsonify({"error": "Unknown action"}), 400)
 
+
 @app.route("/api/user/<int:user_id>/registration_code", methods=["GET", "DELETE"])
 @authenticated()
 @restrict_host
 def registration_code(user_id):
     app.logger.debug("Authenticating...")
     # check user credentials and return fake jwt token if valid
-    remote_address = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
-    app.logger.debug("Input from '%s' on '%s': '%s'", remote_address, request.environ.get("HTTP_ORIGIN", ""), request.json)
+    remote_address = request.environ.get("HTTP_X_REAL_IP", request.remote_addr)
+    app.logger.debug(
+        "Input from '%s' on '%s': '%s'", remote_address, request.environ.get("HTTP_ORIGIN", ""), request.json
+    )
 
     if request.method == "GET":
         user = db.session.query(User).get(user_id)
@@ -217,7 +207,7 @@ def registration_code(user_id):
             if user.registration_code:
                 return make_response(jsonify({"error": "Already has registration code"}), 400)
 
-            expiry = int(request.args.get('expiry')) if request.args.get('expiry') else None
+            expiry = int(request.args.get("expiry")) if request.args.get("expiry") else None
             code = user.add_registration_code(expiry=expiry)
             db.session.commit()
             return jsonify({"code": code})
@@ -240,15 +230,10 @@ def registration_code(user_id):
 @authenticated(role=ROLE_USER)
 @restrict_host
 def view_sensors():
-    app.logger.debug("Request->alerting: %s", request.args.get('alerting'))
+    app.logger.debug("Request->alerting: %s", request.args.get("alerting"))
     if not request.args.get("alerting"):
         return jsonify(
-            [
-                i.serialize
-                for i in db.session.query(Sensor).filter_by(deleted=False).order_by(
-                    Sensor.channel.asc()
-                )
-            ]
+            [i.serialize for i in db.session.query(Sensor).filter_by(deleted=False).order_by(Sensor.channel.asc())]
         )
     return jsonify([i.serialize for i in db.session.query(Sensor).filter_by(alert=True).all()])
 
@@ -308,7 +293,7 @@ def sensor(sensor_id):
                 db.session.commit()
                 return process_ipc_response(IPCClient().update_configuration())
             else:
-                return make_response('', 204)
+                return make_response("", 204)
 
         return jsonify({"error": "Sensor not found"}), (404)
 
@@ -328,8 +313,7 @@ def sensor_types():
 def get_sensor_alert():
     if request.args.get("sensorId"):
         return jsonify(
-            db.session.query(Sensor).filter_by(id=request.args.get("sensorId"), alert=True).first()
-            is not None
+            db.session.query(Sensor).filter_by(id=request.args.get("sensorId"), alert=True).first() is not None
         )
     else:
         return jsonify(db.session.query(Sensor).filter_by(alert=True).first() is not None)
@@ -381,7 +365,7 @@ def zone(zone_id):
                 db.session.commit()
                 return process_ipc_response(IPCClient().update_configuration())
             else:
-                return make_response('', 204)
+                return make_response("", 204)
         else:
             return make_response(jsonify({"error": "Zone not found"}), 404)
 
@@ -447,7 +431,7 @@ def option(option, section):
             if os.environ.get("ARGUS_DEVELOPMENT", "0") == "0":
                 return process_ipc_response(IPCClient().update_ssh())
 
-        return make_response('', 204)
+        return make_response("", 204)
 
     return make_response(jsonify({"error": "Unknown action"}), 400)
 
@@ -492,11 +476,12 @@ def set_clock():
 
 #     return jsonify(True)
 
+
 @app.route("/api/keypads/", methods=["GET"])
 @authenticated(role=ROLE_USER)
 @restrict_host
 def get_keypads():
-    #return jsonify([i.serialize for i in db.session.query(Keypad).filter_by(deleted=False).all()])
+    # return jsonify([i.serialize for i in db.session.query(Keypad).filter_by(deleted=False).all()])
     return jsonify([i.serialize for i in db.session.query(Keypad).all()])
 
 
@@ -504,15 +489,15 @@ def get_keypads():
 @authenticated()
 @restrict_host
 def keypad(keypad_id):
-    '''
+    """
     Limited to handle only one keypad!
-    '''
+    """
     if request.method == "GET":
         keypad = db.session.query(Keypad).first()
         if keypad:
             return jsonify(keypad.serialize)
-        
-        return make_response(jsonify({"error": "Option not found"}), 404 )
+
+        return make_response(jsonify({"error": "Option not found"}), 404)
     elif request.method == "DELETE":
         keypad = db.session.query(Keypad).get(keypad_id)
         if keypad:
@@ -531,7 +516,7 @@ def keypad(keypad_id):
             db.session.commit()
             return process_ipc_response(IPCClient().update_keypad())
         else:
-            return make_response('', 204)
+            return make_response("", 204)
 
     return make_response(jsonify({"error": "Unknown action"}), 400)
 
@@ -547,7 +532,7 @@ def keypadtypes():
 @app.route("/<path:path>")
 @restrict_host
 def catch_all(path):
-    app.logger.debug("Working in: %s", os.environ.get('SERVER_STATIC_FOLDER', ''))
+    app.logger.debug("Working in: %s", os.environ.get("SERVER_STATIC_FOLDER", ""))
     app.logger.debug("FALLBACK for path: %s", path)
 
     # check compression
@@ -578,16 +563,9 @@ def catch_all(path):
             response.headers["Content-Encoding"] = "gzip"
         return response
     elif language and isfile(join(argus_application_folder, language, "index.html")):
-        app.logger.debug("Path exists with language: %s",join(language, 'index.html'))
-        return send_from_directory(
-            join(argus_application_folder, language), "index.html"
-        )
+        app.logger.debug("Path exists with language: %s", join(language, "index.html"))
+        return send_from_directory(join(argus_application_folder, language), "index.html")
 
     # or return with the index file
-    app.logger.debug("INDEX without language: %s", join(language, 'index.html'))
+    app.logger.debug("INDEX without language: %s", join(language, "index.html"))
     return send_from_directory(argus_application_folder, "index.html")
-
-
-
-
-

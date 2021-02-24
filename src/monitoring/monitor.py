@@ -1,8 +1,8 @@
-'''
+"""
 Created on 2017. aug. 28.
 
 @author: gkovacs
-'''
+"""
 
 from datetime import datetime
 import logging
@@ -18,19 +18,43 @@ import monitoring.alert
 from monitoring import storage
 from monitoring.adapters.power import PowerAdapter
 from monitoring.adapters.sensor import SensorAdapter
-from monitoring.constants import POWER_SOURCE_BATTERY, POWER_SOURCE_NETWORK, THREAD_MONITOR, LOG_MONITOR, MONITORING_STARTUP,\
-    ARM_DISARM, MONITOR_STOP, MONITOR_ARM_AWAY, ARM_AWAY, MONITORING_ARMED,\
-    MONITOR_ARM_STAY, ARM_STAY, MONITOR_DISARM, MONITORING_READY,\
-    MONITOR_UPDATE_CONFIG, MONITORING_UPDATING_CONFIG, MONITORING_INVALID_CONFIG,\
-    MONITORING_SABOTAGE, ALERT_AWAY, ALERT_STAY, ALERT_SABOTAGE
+from monitoring.constants import (
+    POWER_SOURCE_BATTERY,
+    POWER_SOURCE_NETWORK,
+    THREAD_MONITOR,
+    LOG_MONITOR,
+    MONITORING_STARTUP,
+    ARM_DISARM,
+    MONITOR_STOP,
+    MONITOR_ARM_AWAY,
+    ARM_AWAY,
+    MONITORING_ARMED,
+    MONITOR_ARM_STAY,
+    ARM_STAY,
+    MONITOR_DISARM,
+    MONITORING_READY,
+    MONITOR_UPDATE_CONFIG,
+    MONITORING_UPDATING_CONFIG,
+    MONITORING_INVALID_CONFIG,
+    MONITORING_SABOTAGE,
+    ALERT_AWAY,
+    ALERT_STAY,
+    ALERT_SABOTAGE,
+)
 from monitoring.database import Session
-from monitoring.socket_io import send_power_state_change, send_system_state_change, send_sensors_state, \
-    send_arm_state, send_alert_state, send_syren_state
+from monitoring.socket_io import (
+    send_power_state_change,
+    send_system_state_change,
+    send_sensors_state,
+    send_arm_state,
+    send_alert_state,
+    send_syren_state,
+)
 
 
 MEASUREMENT_CYCLES = 2
 MEASUREMENT_TIME = 3
-TOLERANCE = float(environ['TOLERANCE'])
+TOLERANCE = float(environ["TOLERANCE"])
 
 # 2000.01.01 00:00:00
 DEFAULT_DATETIME = 946684800
@@ -41,14 +65,14 @@ def is_close(a, b, tolerance=0.0):
 
 
 class Monitor(Thread):
-    '''
+    """
     classdocs
-    '''
+    """
 
     def __init__(self, actions):
-        '''
+        """
         Constructor
-        '''
+        """
         super(Monitor, self).__init__(name=THREAD_MONITOR)
         self._logger = logging.getLogger(LOG_MONITOR)
         self._sensorAdapter = SensorAdapter()
@@ -61,12 +85,12 @@ class Monitor(Thread):
         self._stop_alert = Event()
         self._db_session = None
 
-        self._logger.info('Monitoring created')
+        self._logger.info("Monitoring created")
         storage.set(storage.MONITORING_STATE, MONITORING_STARTUP)
         storage.set(storage.ARM_STATE, ARM_DISARM)
 
     def run(self):
-        self._logger.info('Monitoring started')
+        self._logger.info("Monitoring started")
         self._db_session = Session()
 
         # wait some seconds to build up socket IO connection before emit messages
@@ -85,7 +109,7 @@ class Monitor(Thread):
 
         while True:
             try:
-                action = self._actions.get(True, 1 / int(environ['SAMPLE_RATE']))
+                action = self._actions.get(True, 1 / int(environ["SAMPLE_RATE"]))
                 self._logger.debug("Action: %s" % action)
                 if action == MONITOR_STOP:
                     break
@@ -104,8 +128,11 @@ class Monitor(Thread):
                 elif action == MONITOR_DISARM:
                     current_state = storage.get(storage.MONITORING_STATE)
                     current_arm = storage.get(storage.ARM_STATE)
-                    if current_state == MONITORING_ARMED and current_arm in (ARM_AWAY, ARM_STAY) or \
-                       current_state == MONITORING_SABOTAGE:
+                    if (
+                        current_state == MONITORING_ARMED
+                        and current_arm in (ARM_AWAY, ARM_STAY)
+                        or current_state == MONITORING_SABOTAGE
+                    ):
                         storage.set(storage.ARM_STATE, ARM_DISARM)
                         send_arm_state(ARM_DISARM)
                         storage.set(storage.MONITORING_STATE, MONITORING_READY)
@@ -134,13 +161,11 @@ class Monitor(Thread):
         elif new_power_source == PowerAdapter.SOURCE_NETWORK:
             storage.set(storage.POWER_STATE, POWER_SOURCE_NETWORK)
             self._logger.debug("System works from network")
-        
-        if new_power_source == PowerAdapter.SOURCE_BATTERY and \
-                self._power_source == PowerAdapter.SOURCE_NETWORK:
+
+        if new_power_source == PowerAdapter.SOURCE_BATTERY and self._power_source == PowerAdapter.SOURCE_NETWORK:
             send_power_state_change(POWER_SOURCE_BATTERY)
             self._logger.info("Power outage started!")
-        elif new_power_source == PowerAdapter.SOURCE_NETWORK and \
-                self._power_source == PowerAdapter.SOURCE_BATTERY:
+        elif new_power_source == PowerAdapter.SOURCE_NETWORK and self._power_source == PowerAdapter.SOURCE_BATTERY:
             send_power_state_change(POWER_SOURCE_NETWORK)
             self._logger.info("Power outage ended!")
 
@@ -160,7 +185,7 @@ class Monitor(Thread):
         return True
 
     def load_sensors(self):
-        '''Load the sensors from the db in the thread to avoid session problems'''
+        """Load the sensors from the db in the thread to avoid session problems"""
         storage.set(storage.MONITORING_STATE, MONITORING_UPDATING_CONFIG)
         send_system_state_change(MONITORING_UPDATING_CONFIG)
         send_sensors_state(None)
@@ -174,8 +199,11 @@ class Monitor(Thread):
         self._logger.debug("Sensors reloaded!")
 
         if len(self._sensors) > self._sensorAdapter.channel_count:
-            self._logger.info("Invalid number of sensors to monitor (Found=%s > Max=%s)",
-                              len(self._sensors), self._sensorAdapter.channel_count)
+            self._logger.info(
+                "Invalid number of sensors to monitor (Found=%s > Max=%s)",
+                len(self._sensors),
+                self._sensorAdapter.channel_count,
+            )
             self._sensors = []
             storage.set(storage.MONITORING_STATE, MONITORING_INVALID_CONFIG)
             send_system_state_change(MONITORING_INVALID_CONFIG)
@@ -217,18 +245,18 @@ class Monitor(Thread):
             if sensor.alert:
                 sensor.alert = False
                 changed = True
-                self._logger.debug('Cleared sensor')
+                self._logger.debug("Cleared sensor")
 
         for alert in self._db_session.query(Alert).filter_by(end_time=None).all():
             alert.end_time = datetime.fromtimestamp(DEFAULT_DATETIME)
-            self._logger.debug('Cleared alert')
+            self._logger.debug("Cleared alert")
             changed = True
 
         if changed:
-            self._logger.debug('Cleared db')
+            self._logger.debug("Cleared db")
             self._db_session.commit()
         else:
-            self._logger.debug('Cleared nothing')
+            self._logger.debug("Cleared nothing")
 
     def save_sensor_references(self, references):
         for sensor in self._sensors:
@@ -260,13 +288,14 @@ class Monitor(Thread):
             # self._logger.debug("Sensor({}): R:{} -> V:{}".format(sensor.channel, sensor.reference_value, value))
             if not is_close(value, sensor.reference_value, TOLERANCE):
                 if not sensor.alert:
-                    self._logger.debug('Alert on channel: %s, (changed %s -> %s)',
-                                       sensor.channel, sensor.reference_value, value)
+                    self._logger.debug(
+                        "Alert on channel: %s, (changed %s -> %s)", sensor.channel, sensor.reference_value, value
+                    )
                     sensor.alert = True
                     changes = True
             else:
                 if sensor.alert:
-                    self._logger.debug('Cleared alert on channel: %s', sensor.channel)
+                    self._logger.debug("Cleared alert on channel: %s", sensor.channel)
                     sensor.alert = False
                     changes = True
 
@@ -278,9 +307,9 @@ class Monitor(Thread):
             send_sensors_state(found_alert)
 
     def handle_alerts(self):
-        '''
+        """
         Checking for alerting sensors if armed
-        '''
+        """
 
         # save current state to avoid concurrency
         current_arm = storage.get(storage.ARM_STATE)
@@ -301,12 +330,14 @@ class Monitor(Thread):
                     delay = sensor.zone.stay_delay
 
                 if alert_type:
-                    self._alerts[sensor.id] = {'alert': monitoring.alert.SensorAlert(sensor.id, delay, alert_type, self._stop_alert)}
-                    self._alerts[sensor.id]['alert'].start()
+                    self._alerts[sensor.id] = {
+                        "alert": monitoring.alert.SensorAlert(sensor.id, delay, alert_type, self._stop_alert)
+                    }
+                    self._alerts[sensor.id]["alert"].start()
                     changes = True
                     self._stop_alert.clear()
             elif not sensor.alert and sensor.id in self._alerts:
-                if self._alerts[sensor.id]['alert']._alert_type == ALERT_SABOTAGE:
+                if self._alerts[sensor.id]["alert"]._alert_type == ALERT_SABOTAGE:
                     # stop sabotage
                     storage.set(storage.MONITORING_STATE, MONITORING_READY)
                     send_system_state_change(MONITORING_READY)

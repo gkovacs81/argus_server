@@ -17,7 +17,6 @@ from sqlalchemy.orm.mapper import validates
 from stringcase import camelcase, snakecase
 
 
-
 def hash_code(access_code):
     return hashlib.sha256((access_code + ":" + os.environ.get("SALT")).encode("utf-8")).hexdigest()
 
@@ -30,8 +29,10 @@ def convert2camel(data):
 
     return converted
 
+
 metadata = MetaData()
 Base = declarative_base(metadata=metadata)
+
 
 class BaseModel(Base):
     """Base data model for all objects"""
@@ -49,7 +50,10 @@ class BaseModel(Base):
         """
         Define a base way to jsonify models, dealing with datetime objects
         """
-        return {column: value if not isinstance(value, datetime.date) else value.strftime("%Y-%m-%d") for column, value in self.__dict__.items()}
+        return {
+            column: value if not isinstance(value, datetime.date) else value.strftime("%Y-%m-%d")
+            for column, value in self.__dict__.items()
+        }
 
     def update_record(self, attributes, data):
         """Update the given attributes of the record (dict) based on a dictionary"""
@@ -89,9 +93,7 @@ class SensorType(BaseModel):
 
     @property
     def serialize(self):
-        return convert2camel(
-            self.serialize_attributes(("id", "name", "description"))
-        )
+        return convert2camel(self.serialize_attributes(("id", "name", "description")))
 
     @validates("name")
     def validates_name(self, key, name):
@@ -167,13 +169,17 @@ class Alert(BaseModel):
     @property
     def serialize(self):
         locale.setlocale(locale.LC_ALL)
-        return convert2camel({
-            "id": self.id,
-            "alert_type": self.alert_type,
-            "start_time": self.start_time.replace(microsecond=0, tzinfo=None).isoformat(sep=" "),
-            "end_time": self.end_time.replace(microsecond=0, tzinfo=None).isoformat(sep=" ") if self.end_time else "",
-            "sensors": [alert_sensor.serialize for alert_sensor in self.sensors],
-        })
+        return convert2camel(
+            {
+                "id": self.id,
+                "alert_type": self.alert_type,
+                "start_time": self.start_time.replace(microsecond=0, tzinfo=None).isoformat(sep=" "),
+                "end_time": self.end_time.replace(microsecond=0, tzinfo=None).isoformat(sep=" ")
+                if self.end_time
+                else "",
+                "sensors": [alert_sensor.serialize for alert_sensor in self.sensors],
+            }
+        )
 
 
 class AlertSensor(BaseModel):
@@ -193,9 +199,7 @@ class AlertSensor(BaseModel):
 
     @property
     def serialize(self):
-        return convert2camel(
-            self.serialize_attributes(("sensor_id", "channel", "type_id", "description"))
-        )
+        return convert2camel(self.serialize_attributes(("sensor_id", "channel", "type_id", "description")))
 
 
 class Zone(BaseModel):
@@ -269,8 +273,8 @@ class User(BaseModel):
 
     def update(self, data):
         fields = ("name", "email", "role", "comment")
-        access_code = data.get("access_code", '')
-        if data.get("access_code", ''):
+        access_code = data.get("access_code", "")
+        if data.get("access_code", ""):
             assert len(access_code) >= 4 and len(access_code) <= 12, "Access code length (>=4, <=12)"
             assert access_code.isdigit(), "Access code only number"
             data["access_code"] = hash_code(access_code)
@@ -280,7 +284,10 @@ class User(BaseModel):
                 assert len(data["fourkey_code"]) == 4, "Fourkey code length (=4)"
                 assert data["fourkey_code"].isdigit(), "Fourkey code only number"
                 data["fourkey_code"] = hash_code(data["fourkey_code"])
-            fields += ("access_code", "fourkey_code",)
+            fields += (
+                "access_code",
+                "fourkey_code",
+            )
 
         return self.update_record(fields, data)
 
@@ -294,35 +301,38 @@ class User(BaseModel):
         else:
             registration_expiry = datetime.datetime.now() + datetime.timedelta(seconds=expiry)
 
-        if self.update_record(("registration_code", "registration_expiry"), {
-            "registration_code": hash_code(registration_code),
-            "registration_expiry": registration_expiry
-        }):
+        if self.update_record(
+            ("registration_code", "registration_expiry"),
+            {"registration_code": hash_code(registration_code), "registration_expiry": registration_expiry},
+        ):
             return registration_code
 
     @property
     def serialize(self):
-        return convert2camel({
-            "id": self.id,
-            "name": self.name,
-            "email": self.email,
-            "has_registration_code": bool(self.registration_code),
-            "registration_expiry":
-                self.registration_expiry.strftime("%Y-%m-%dT%H:%M:%S") if self.registration_expiry else None,
-            "role": self.role,
-            "comment": self.comment
-        })
+        return convert2camel(
+            {
+                "id": self.id,
+                "name": self.name,
+                "email": self.email,
+                "has_registration_code": bool(self.registration_code),
+                "registration_expiry": self.registration_expiry.strftime("%Y-%m-%dT%H:%M:%S")
+                if self.registration_expiry
+                else None,
+                "role": self.role,
+                "comment": self.comment,
+            }
+        )
 
     @validates("name")
     def validates_name(self, key, name):
-        assert (0 < len(name) <= User.NAME_LENGTH), f"Incorrect user name field length ({len(name)})"
+        assert 0 < len(name) <= User.NAME_LENGTH, f"Incorrect user name field length ({len(name)})"
         return name
 
     @validates("email")
     def validates_email(self, key, email):
         assert 0 <= len(email) <= User.EMAIL_LENGTH, f"Incorrect email field length ({len(email)})"
         if len(email):
-            email_format = '^[a-z0-9]+[\._]?[a-z0-9]+[@]\w+[.]\w{2,3}$'
+            email_format = "^[a-z0-9]+[\._]?[a-z0-9]+[@]\w+[.]\w{2,3}$"
             assert search(email_format, email), "Invalid email format"
         return email
 
@@ -362,11 +372,7 @@ class Option(BaseModel):
         filtered_value = deepcopy(json.loads(self.value))
         filter_keys(filtered_value, ["smtp_password"])
         filter_keys(filtered_value, ["password"])
-        return convert2camel({
-            "name": self.name,
-            "section": self.section,
-            "value": filtered_value
-        })
+        return convert2camel({"name": self.name, "section": self.section, "value": filtered_value})
 
     @validates("name", "section")
     def validates_name(self, key, option):
@@ -401,9 +407,7 @@ class Keypad(BaseModel):
 
     @property
     def serialize(self):
-        return convert2camel(
-            self.serialize_attributes(("id", "type_id", "enabled"))
-        )
+        return convert2camel(self.serialize_attributes(("id", "type_id", "enabled")))
 
 
 class KeypadType(BaseModel):
@@ -422,6 +426,4 @@ class KeypadType(BaseModel):
 
     @property
     def serialize(self):
-        return convert2camel(
-            self.serialize_attributes(("id", "name", "description"))
-        )
+        return convert2camel(self.serialize_attributes(("id", "name", "description")))

@@ -1,8 +1,8 @@
-'''
+"""
 Created on 2018. jan. 8.
 
 @author: gkovacs
-'''
+"""
 
 import json
 import logging
@@ -13,21 +13,22 @@ from monitoring.constants import LOG_ADGSM
 
 
 class GSM(object):
-
     def __init__(self):
         self._logger = logging.getLogger(LOG_ADGSM)
         self._options = None
 
     def setup(self):
         self._options = {}
-        self._options['pin_code'] = '4321'
-        self._options['port'] = os.environ['GSM_PORT']
-        self._options['baud'] = os.environ['GSM_PORT_BAUD']
+        self._options["pin_code"] = "4321"
+        self._options["port"] = os.environ["GSM_PORT"]
+        self._options["baud"] = os.environ["GSM_PORT_BAUD"]
 
-        self._logger.info('Connecting to GSM modem on %s with %s baud (PIN: %s)...', 
-                          self._options['port'],
-                          self._options['baud'],
-                          self._options['pin_code'])
+        self._logger.info(
+            "Connecting to GSM modem on %s with %s baud (PIN: %s)...",
+            self._options["port"],
+            self._options["baud"],
+            self._options["pin_code"],
+        )
 
         return True
 

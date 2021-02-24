@@ -3,7 +3,8 @@ from server.tools import process_ipc_response
 from server.decorators import registered
 from server.ipc import IPCClient
 
-power = Blueprint('power', __name__)
+power = Blueprint("power", __name__)
+
 
 @power.route("/api/power", methods=["GET"])
 @registered
