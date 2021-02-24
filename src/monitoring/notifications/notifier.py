@@ -7,9 +7,10 @@ from smtplib import SMTPException
 from threading import Thread
 from time import sleep
 
-from models import db, Option
+from models import Option
 from monitoring.constants import (LOG_NOTIFIER, MONITOR_STOP,
                                   MONITOR_UPDATE_CONFIG, THREAD_NOTIFIER)
+from monitoring.database import Session
 from monitoring.notifications.templates import (ALERT_STARTED_EMAIL,
                                                 ALERT_STARTED_SMS,
                                                 ALERT_STOPPED_EMAIL,
@@ -28,7 +29,6 @@ Messages
 {
     "type": "alert_started" / "alert_stopped",
     "id": "alert id",
-    "source": "address",
     "sensors": ["Sensor name"],
     "time": "start time",
 }
@@ -76,7 +76,6 @@ class Notifier(Thread):
         cls._actions.put({
             'type': ALERT_STARTED,
             'id': alert_id,
-            'source': "argus113",
             'sensors': sensors,
             'time': time,
         })
@@ -86,12 +85,12 @@ class Notifier(Thread):
         cls._actions.put({
             'type': ALERT_STOPPED,
             'id': alert_id,
-            'source': "argus113",
             'time': time
         })
 
-    def __init__(self):
+    def __init__(self, notifications_queue):
         super(Notifier, self).__init__(name=THREAD_NOTIFIER)
+        Notifier._actions = notifications_queue
         self._logger = logging.getLogger(LOG_NOTIFIER)
         self._gsm = GSM()
         self._messages = []
@@ -105,7 +104,7 @@ class Notifier(Thread):
         # Workaround to avoid hanging of keypad process on create_engine
         sleep(5)
         # --------------------------------------------------------------
-        self._db_session = db.create_scoped_session()
+        self._db_session = Session()
         self._options = self.get_options()
         self._logger.info("Subscription configuration: %s", self._options['subscriptions'])
 
@@ -113,7 +112,7 @@ class Notifier(Thread):
         while True:
             message = None
             try:
-                message = Notifier._actions.get(timeout=Notifier.RETRY_WAIT)
+                message = self._actions.get(timeout=Notifier.RETRY_WAIT)
             except Empty:
                 # self._logger.debug("No message found")
                 pass
@@ -152,7 +151,7 @@ class Notifier(Thread):
                 name='notifications', section=section_name).first()
             options[section_name] = json.loads(
                 section.value) if section else ''
-        self._logger.info("Notifier loaded subscriptions: {}".format(options))
+        self._logger.debug("Notifier loaded subscriptions: {}".format(options))
         return options
 
     def send_message(self, message):
@@ -175,8 +174,8 @@ class Notifier(Thread):
                 elif message['type'] == ALERT_STOPPED:
                     has_subscription = True
                     success |= self.notify_alert_stopped_email(message)
-        except (KeyError, TypeError):
-            self._logger.info("No subscription configured!")
+        except (KeyError, TypeError) as error:
+            self._logger.info("Failed to send message: '%s'! (%s)", message, error)
         except Exception:
             self._logger.exception("Sending message failed!")
 

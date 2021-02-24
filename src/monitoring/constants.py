@@ -3,7 +3,7 @@ Created on 2017. dec. 3.
 
 @author: gkovacs
 '''
-from logging import DEBUG, INFO
+from logging import DEBUG, INFO, ERROR
 
 
 # Threads and logging
@@ -14,18 +14,24 @@ THREAD_NOTIFIER = 'Notifier'
 THREAD_SOCKETIO = 'SocketIO'
 THREAD_ALERT    = 'Alert'
 THREAD_KEYPAD   = 'Keypad'
+THREAD_SECCON   = 'SecCon'
 
-LOG_SERVICE   = THREAD_SERVICE
-LOG_MONITOR   = THREAD_MONITOR
-LOG_IPC       = THREAD_IPC
-LOG_ALERT     = THREAD_ALERT
-LOG_SOCKETIO  = THREAD_SOCKETIO
-LOG_NOTIFIER  = THREAD_NOTIFIER
-LOG_ADSENSOR  = 'AD.Sensor'
-LOG_ADPOWER   = 'AD.Power'
-LOG_ADSYREN   = 'AD.Syren'
-LOG_ADGSM     = 'AD.GSM'
-LOG_ADKEYPAD  = 'AD.Keypad'
+LOG_SERVICE    = THREAD_SERVICE
+LOG_MONITOR    = THREAD_MONITOR
+LOG_IPC        = THREAD_IPC
+LOG_ALERT      = THREAD_ALERT
+LOG_SOCKETIO   = THREAD_SOCKETIO
+LOG_NOTIFIER   = THREAD_NOTIFIER
+LOG_ADSENSOR   = 'AD.Sensor'
+LOG_ADPOWER    = 'AD.Power'
+LOG_ADSYREN    = 'AD.Syren'
+LOG_ADGSM      = 'AD.GSM'
+LOG_ADKEYPAD   = 'AD.Keypad'
+LOG_SECCON     = THREAD_SECCON
+LOG_SC_CERTBOT = 'SC.CertBot'
+LOG_SC_DYNDNS  = 'SC.DynDns'
+LOG_SC_ACCESS  = 'SC.Access'
+LOG_CLOCK      = 'Clock'
 
 LOGGING_MODULES = [
     (LOG_SERVICE, INFO),
@@ -37,7 +43,12 @@ LOGGING_MODULES = [
     (LOG_ADSENSOR, INFO),
     (LOG_ADSYREN, INFO),
     (LOG_ADGSM, INFO),
-    (LOG_ADKEYPAD, INFO)
+    (LOG_ADKEYPAD, INFO),
+    (LOG_SECCON, INFO),
+    (LOG_SC_CERTBOT, INFO),
+    (LOG_SC_DYNDNS, INFO),
+    (LOG_SC_ACCESS, INFO),
+    (LOG_CLOCK, INFO)
 ]
 
 # INTERNAL CONSTANTS
@@ -45,12 +56,17 @@ LOGGING_MODULES = [
 MONITOR_ARM_AWAY = 'monitor_arm_away'
 MONITOR_ARM_STAY = 'monitor_arm_stay'
 MONITOR_DISARM = 'monitor_disarm'
+MONITOR_GET_STATE = 'monitor_get_state'
+MONITOR_GET_ARM = 'monitor_get_arm'
 MONITOR_UPDATE_CONFIG = 'monitor_update_config'
 MONITOR_UPDATE_KEYPAD = 'monitor_update_keypad'
-MONITOR_UPDATE_DYNDNS = 'monitor_update_dyndns'
 MONITOR_STOP = 'monitor_stop'
 MONITOR_SYNC_CLOCK = 'monitor_sync_clock'
 MONITOR_SET_CLOCK = 'monitor_set_clock'
+
+UPDATE_SECURE_CONNECTION = 'monitor_update_secure_connection'
+POWER_GET_STATE = 'power_get_state'
+UPDATE_SSH = 'update_ssh'
 
 '''---------------------------------------------------------------'''
 # CONSTANTS USED ALSO BY THE WEB APPLICATION
@@ -76,6 +92,9 @@ MONITORING_INVALID_CONFIG = 'monitoring_invalid_config'
 MONITORING_ARMED = 'monitoring_armed'
 MONITORING_SABOTAGE = 'monitoring_sabotage'
 MONITORING_ERROR = 'monitoring_error'
+
+POWER_SOURCE_NETWORK = 'network'
+POWER_SOURCE_BATTERY = 'battery'
 
 ROLE_ADMIN = 'admin'
 ROLE_USER = 'user'

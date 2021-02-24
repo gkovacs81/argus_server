@@ -6,22 +6,20 @@ Created on 2017. szept. 13.
 
 from datetime import datetime
 import logging
+import json
 import pytz
 from threading import Thread, BoundedSemaphore
 from time import time
 
-from models import db, Alert, AlertSensor, Sensor
+from models import Alert, AlertSensor, Option, Sensor
+from monitoring import storage
 from monitoring.adapters.syren import SyrenAdapter
+from monitoring.database import Session
+from monitoring.notifications.notifier import Notifier
 from monitoring.socket_io import send_syren_state, send_alert_state, send_system_state_change
 from monitoring.constants import ALERT_SABOTAGE, MONITORING_SABOTAGE, LOG_ALERT, THREAD_ALERT
 from multiprocessing import Queue
 from queue import Empty
-from monitoring import storage
-from monitoring.notifications.notifier import Notifier
-
-
-SYREN_DEFAULT_ALERT_TIME = 10
-SYREN_DEFAULT_SUSPEND_TIME = 5
 
 
 class SensorAlert(Thread):
@@ -51,7 +49,7 @@ class SensorAlert(Thread):
             SyrenAlert.start_syren(self._alert_type, SensorAlert._sensor_queue, self._stop_event)
             SensorAlert._sensor_queue.put(self._sensor_id)
             if self._alert_type == ALERT_SABOTAGE:
-                storage.set("state", MONITORING_SABOTAGE)
+                storage.set(storage.MONITORING_STATE, MONITORING_SABOTAGE)
                 send_system_state_change(MONITORING_SABOTAGE)
         else:
             self._logger.info("Sensor alert stopped")
@@ -61,6 +59,10 @@ class SyrenAlert(Thread):
     """
     Handling of syren alerts.
     """
+    
+    # default timing
+    ALERT_TIME = 600 # 10 minutes
+    SUSPEND_TIME = 300 # 5 minutes
 
     _semaphore = BoundedSemaphore()
     _alert = None
@@ -88,8 +90,9 @@ class SyrenAlert(Thread):
         self._db_session = None
 
     def run(self):
-        if not self._db_session:
-            self._db_session = db.create_scoped_session()
+        self._db_session = Session()
+
+        self.load_syren_config()
 
         self.start_alert()
         start_time = time()
@@ -99,13 +102,13 @@ class SyrenAlert(Thread):
                 break
 
             now = time()
-            if (now - start_time > SYREN_DEFAULT_ALERT_TIME) and sysren_is_on:
+            if (now - start_time > SyrenAlert.ALERT_TIME) and sysren_is_on:
                 start_time = time()
                 sysren_is_on = False
                 self._syren.alert(sysren_is_on)
                 send_syren_state(sysren_is_on)
                 self._logger.info("Syren suspended")
-            elif (now - start_time > SYREN_DEFAULT_SUSPEND_TIME) and not sysren_is_on:
+            elif (now - start_time > SyrenAlert.SUSPEND_TIME) and not sysren_is_on:
                 start_time = time()
                 sysren_is_on = True
                 self._syren.alert(sysren_is_on)
@@ -117,20 +120,36 @@ class SyrenAlert(Thread):
         self.stop_alert()
         self._db_session.close()
 
+
+    def load_syren_config(self):
+        syren_config = self._db_session.query(Option).filter_by(name="sysren", section="timing").first()
+        if syren_config:
+            syren_config = json.loads(syren_config.value)
+        else:
+            self._logger.error("Missing syren settings!")
+            return
+
+        SyrenAlert.ALERT_TIME = syren_config["alert_time"]
+        SyrenAlert.SUSPEND_TIME = syren_config["suspend_time"]
+
+
     def start_alert(self):
         start_time = datetime.now(pytz.timezone("CET"))
         self._alert = Alert(self._alert_type, start_time=start_time, sensors=[])
         self._db_session.add(self._alert)
         self._db_session.commit()
+        self.handle_sensors()
 
         send_alert_state(self._alert.serialize)
         self._syren.alert(True)
         send_syren_state(True)
 
-        sensor_descriptions = list(map(lambda alert_sensor: alert_sensor.sensor.description, self._alert.sensors))
+        self._logger.debug("Alerting sensors: %s", self._alert.sensors)
+        sensor_descriptions = list(map(lambda alert_sensor: f"{alert_sensor.sensor.description}(id:{alert_sensor.sensor.id}/CH{alert_sensor.sensor.channel+1})", self._alert.sensors))
         Notifier.notify_alert_started(self._alert.id, sensor_descriptions, start_time)
 
         self._logger.info("Alert started")
+
 
     def stop_alert(self):
         with SyrenAlert._semaphore:
@@ -145,6 +164,7 @@ class SyrenAlert(Thread):
             Notifier.notify_alert_stopped(self._alert.id, self._alert.end_time)
 
         self._logger.info("Alert stopped")
+
 
     def handle_sensors(self):
         sensor_added = False

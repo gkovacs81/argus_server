@@ -9,10 +9,10 @@ import socket
 from os import environ
 
 from monitoring.constants import (ARM_AWAY, ARM_STAY, MONITOR_ARM_AWAY,
-                                  MONITOR_ARM_STAY, MONITOR_DISARM,
+                                  MONITOR_ARM_STAY, MONITOR_DISARM, POWER_GET_STATE,
                                   MONITOR_SET_CLOCK, MONITOR_SYNC_CLOCK,
-                                  MONITOR_UPDATE_CONFIG, MONITOR_UPDATE_DYNDNS,
-                                  MONITOR_UPDATE_KEYPAD, MONITORING_ERROR)
+                                  MONITOR_UPDATE_CONFIG, UPDATE_SECURE_CONNECTION,
+                                  MONITOR_UPDATE_KEYPAD, MONITOR_GET_STATE, MONITOR_GET_ARM, UPDATE_SSH)
 
 
 class IPCClient(object):
@@ -36,7 +36,7 @@ class IPCClient(object):
 
     def get_arm(self):
         return self._send_message({
-            'action': 'get_arm'
+            'action': MONITOR_GET_ARM
         })
 
     def arm(self, arm_type):
@@ -53,7 +53,12 @@ class IPCClient(object):
 
     def get_state(self):
         return self._send_message({
-            'action': 'get_state'
+            'action': MONITOR_GET_STATE
+        })
+
+    def get_power_state(self):
+        return self._send_message({
+            'action': POWER_GET_STATE
         })
 
     def update_configuration(self):
@@ -68,7 +73,12 @@ class IPCClient(object):
 
     def update_dyndns(self):
         return self._send_message({
-            'action': MONITOR_UPDATE_DYNDNS
+            'action': UPDATE_SECURE_CONNECTION
+        })
+
+    def update_ssh(self):
+        return self._send_message({
+            'action': UPDATE_SSH
         })
 
     def sync_clock(self):
@@ -88,5 +98,3 @@ class IPCClient(object):
             self._socket.send(json.dumps(message).encode())
             data = self._socket.recv(1024)
             return json.loads(data.decode())
-        else:
-            return {"state": MONITORING_ERROR}

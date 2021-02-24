@@ -9,6 +9,4 @@ source etc/common.$1.env
 source etc/monitor.$1.env
 source etc/secrets.env
 
-. ./$PYENV/bin/activate
-
-./src/hash.py $2
+pipenv run ./src/hash.py $2

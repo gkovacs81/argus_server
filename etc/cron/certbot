@@ -1,1 +1,0 @@
-@daily root (echo "Start: "$(date) && /etc/letsencrypt/certbot-auto renew --text && echo "End: "$(date)) 2>&1 >> /var/log/letsencrypt-certbot-cron.log && systemctl restart argus_server

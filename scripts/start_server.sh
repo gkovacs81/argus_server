@@ -9,15 +9,13 @@ source etc/common.$1.env
 source etc/server.$1.env
 source etc/secrets.env
 
-source scripts/install.sh
-
-. ./$PYENV/bin/activate
-
 if [ "$1" == "dev" ] || [ "$1" == "demo" ]; then
-  printenv
-  $PYENV/bin/python3 -s -m flask run -h $SERVER_HOST -p $SERVER_PORT
+  pipenv sync --dev
+  pipenv run printenv
+  pipenv run flask run -h $SERVER_HOST -p $SERVER_PORT
 elif [ "$1" == "prod" ]; then
-  PYTHONUNBUFFERED=1 gunicorn \
+  pipenv sync
+  pipenv run gunicorn \
     --workers 2 \
     --umask 0117 \
     --error-logfile - \

@@ -9,16 +9,15 @@ import socket
 from os import chmod, chown, environ, makedirs, path, remove
 from threading import Thread
 
-from certificates import update_certificates
-from dyndns import update_ip
 from monitoring import storage
 from monitoring.constants import (LOG_IPC, MONITOR_ARM_AWAY, MONITOR_ARM_STAY,
-                                  MONITOR_DISARM, MONITOR_SET_CLOCK,
+                                  MONITOR_DISARM, POWER_GET_STATE, MONITOR_SET_CLOCK,
                                   MONITOR_SYNC_CLOCK, MONITOR_UPDATE_CONFIG,
-                                  MONITOR_UPDATE_DYNDNS, MONITOR_UPDATE_KEYPAD,
-                                  THREAD_IPC)
-from server.tools import enable_certbot_job, enable_dyndns_job
-from tools.clock import set_clock, sync_clock
+                                  UPDATE_SECURE_CONNECTION, MONITOR_UPDATE_KEYPAD,
+                                  THREAD_IPC, MONITOR_GET_ARM, MONITOR_GET_STATE, UPDATE_SSH)
+from tools.clock import Clock
+from tools.connection import SecureConnection
+from tools.ssh import SSH
 
 MONITOR_INPUT_SOCKET = environ["MONITOR_INPUT_SOCKET"]
 
@@ -48,7 +47,7 @@ class IPCServer(Thread):
         except OSError:
             pass
 
-        self.createPIDFile()
+        self.create_socket_file()
         self._socket.bind(MONITOR_INPUT_SOCKET)
         self._socket.listen(1)
 
@@ -59,13 +58,24 @@ class IPCServer(Thread):
         except KeyError:
             self._logger.info("No permission or owner defined")
 
-    def createPIDFile(self):
+    def create_socket_file(self):
         filename = MONITOR_INPUT_SOCKET
         if not path.exists(path.dirname(filename)):
             self._logger.info("Create socket file: %s", MONITOR_INPUT_SOCKET)
             makedirs(path.dirname(filename))
 
     def handle_actions(self, message):
+        '''
+        Return value:
+        {
+            "result": boolean, # True if succeded
+            "message": string, # Error message
+            "value: dict # value to return
+        }
+        '''
+        return_value = {
+            "result": True
+        }
         if message["action"] == MONITOR_ARM_AWAY:
             self._logger.info("Action: arm AWAY")
             self._broadcaster.send_message(MONITOR_ARM_AWAY)
@@ -75,32 +85,37 @@ class IPCServer(Thread):
         elif message["action"] == MONITOR_DISARM:
             self._logger.info("Action: disarm")
             self._broadcaster.send_message(MONITOR_DISARM)
-        elif message["action"] == "get_arm":
-            arm = storage.get("arm")
-            return {"type": arm}
-        elif message["action"] == "get_state":
-            return {"state": storage.get("state")}
+        elif message["action"] == MONITOR_GET_ARM:
+            return_value["value"] = {"type": storage.get(storage.ARM_STATE)}
+        elif message["action"] == MONITOR_GET_STATE:
+            return_value["value"] = {"state": storage.get(storage.MONITORING_STATE)}
         elif message["action"] == MONITOR_UPDATE_CONFIG:
             self._logger.info("Update configuration...")
             self._broadcaster.send_message(MONITOR_UPDATE_CONFIG)
         elif message["action"] == MONITOR_UPDATE_KEYPAD:
             self._logger.info("Update keypad...")
             self._broadcaster.send_message(MONITOR_UPDATE_KEYPAD)
-        elif message["action"] == MONITOR_UPDATE_DYNDNS:
-            self._logger.info("Update dyndns...")
-            # update configuration
-            update_ip(True)
-            update_certificates()
-            # enable cron jobs for update configuration periodically
-            enable_dyndns_job()
-            enable_certbot_job()
+        elif message["action"] == UPDATE_SECURE_CONNECTION:
+            self._logger.info("Update secure connection...")
+            SecureConnection(self._stop_event).run()
+        elif message["action"] == UPDATE_SSH:
+            self._logger.info("Update ssh connection...")
+            SSH().update_ssh_service()
         elif message["action"] == MONITOR_SYNC_CLOCK:
-            sync_clock()
+            if not Clock().sync_clock():
+                return_value["result"] = False
+                return_value["message"] = "Failed to sync time"
         elif message["action"] == MONITOR_SET_CLOCK:
-            del message["action"]
-            set_clock(message)
+            if not Clock().set_clock(message):
+                return_value["result"] = False
+                return_value["message"] = "Failed to update date/time and zone"
+        elif message["action"] == POWER_GET_STATE:
+            return_value["value"] = {"state": storage.get(storage.POWER_STATE)}
+        else:
+            return_value["result"] = False
+            return_value["message"] = "Unknown command"
 
-        return {"result": True}
+        return return_value
 
     def run(self):
         self._logger.info("IPC server started")
@@ -108,7 +123,7 @@ class IPCServer(Thread):
         while not self._stop_event.is_set():
             connection = None
             try:
-                connection, self._address = self._socket.accept()
+                connection, _ = self._socket.accept()
             except socket.timeout:
                 pass
 

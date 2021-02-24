@@ -134,6 +134,7 @@ class Keypad(Process):
 
                 if hash_code(presses) in self._codes:
                     self._logger.debug("Code: %s", presses)
+                    self._logger.info("Accepted code => disarming")
                     self._responses.put(MONITOR_DISARM)
                     self._keypad.set_armed(False)
                     presses = ""

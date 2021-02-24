@@ -8,17 +8,19 @@ ALERT_STARTED_SMS = 'Alert({id}) started at {time}!'
 ALERT_STARTED_EMAIL = '''
 Hi,
 
-You have an alert({id}) at {source} since {time}.
+You have an alert({id}) since {time}.
 The alert started on sensor(s): {sensors}!
 
-argus security
+ArPI Home Security
+
 '''
 
 ALERT_STOPPED_SMS = 'Alert({id}) stopped at {time}!'
 ALERT_STOPPED_EMAIL = '''
 Hi,
 
-The alert({id}) at {source} stopped at {time}!
+The alert({id}) stopped at {time}!
 
-argus security
+ArPI Home Security
+
 '''
