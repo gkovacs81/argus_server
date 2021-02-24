@@ -3,7 +3,7 @@ Created on 2017. dec. 3.
 
 @author: gkovacs
 """
-from logging import DEBUG, INFO, ERROR
+from logging import INFO
 
 
 # Threads and logging

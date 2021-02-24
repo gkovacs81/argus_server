@@ -153,7 +153,7 @@ class SyrenAlert(Thread):
         self._logger.debug("Alerting sensors: %s", self._alert.sensors)
         sensor_descriptions = list(
             map(
-                lambda alert_sensor: f"{alert_sensor.sensor.description}(id:{alert_sensor.sensor.id}/CH{alert_sensor.sensor.channel+1})",
+                lambda item: f"{item.sensor.description}(id:{item.sensor.id}/CH{item.sensor.channel+1})",
                 self._alert.sensors,
             )
         )

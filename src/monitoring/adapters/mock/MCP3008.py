@@ -1,4 +1,3 @@
-import os
 import logging
 
 from time import time
@@ -44,7 +43,9 @@ class PatternBasedMockMCP3008(object):
     @property
     def value(self):
         try:
-            # self._logger.debug("Values from %s (channel: %s): %s", self.__class__.__name__, self._channel, self._alert_source[self.i])
+            self._logger.debug(
+                "Values from %s (channel: %s): %s", self.__class__.__name__, self._channel, self._alert_source[self.i]
+            )
             value = self._alert_source[self.i][self._channel]
         except (KeyError, TypeError, IndexError):
             value = 0

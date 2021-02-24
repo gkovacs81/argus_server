@@ -5,10 +5,10 @@ from queue import Empty
 from time import time
 
 from sqlalchemy.engine import create_engine
+from sqlalchemy.engine.url import URL
 from sqlalchemy.orm.session import sessionmaker
 
 import models
-from models import Keypad, User, hash_code
 from monitoring.adapters.keypads.base import KeypadBase
 from monitoring.adapters.mock.keypad import MockKeypad
 from monitoring.constants import (
@@ -56,13 +56,25 @@ class Keypad(Process):
 
     def configure(self):
         # load from db
-        # when hangs here check workaround in Notifier
-        uri = f"postgresql+psycopg2://{os.environ.get('DB_USER', None)}:{os.environ.get('DB_PASSWORD', None)}@{os.environ.get('DB_HOST', None)}:{os.environ.get('DB_PORT', None)}/{os.environ.get('DB_SCHEMA', None)}"
+        uri = None
+        try:
+            uri = URL(
+                drivername="postgresql+psycopg2",
+                username=os.environ.get("DB_USER", None),
+                password=os.environ.get("DB_PASSWORD", None),
+                host=os.environ.get("DB_HOST", None),
+                port=os.environ.get("DB_PORT", None),
+                database=os.environ.get("DB_SCHEMA", None),
+            )
+        except KeyError:
+            self._logger.error("Database connnection not configured")
+            return
+
         engine = create_engine(uri)
         Session = sessionmaker(bind=engine)
         db_session = Session()
 
-        users = db_session.query(User).all()
+        users = db_session.query(models.User).all()
         self._codes = [user.fourkey_code for user in users]
 
         keypad_settings = db_session.query(models.Keypad).first()
@@ -137,7 +149,7 @@ class Keypad(Process):
                     self._logger.debug("Presses: %s", presses)
                 self._keypad.pressed = None
 
-                if hash_code(presses) in self._codes:
+                if models.hash_code(presses) in self._codes:
                     self._logger.debug("Code: %s", presses)
                     self._logger.info("Accepted code => disarming")
                     self._responses.put(MONITOR_DISARM)

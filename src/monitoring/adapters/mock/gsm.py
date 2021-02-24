@@ -4,11 +4,9 @@ Created on 2018. jan. 8.
 @author: gkovacs
 """
 
-import json
 import logging
 import os
 
-from models import Option
 from monitoring.constants import LOG_ADGSM
 
 

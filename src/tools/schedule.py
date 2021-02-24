@@ -10,6 +10,25 @@ from crontab import CronTab
 from monitoring.constants import LOG_IPC
 
 
+dyndns_job = (
+    "systemd-cat -t 'argus_dyndns' "
+    "bash -c '. /home/argus/server/pyenv/bin/activate; "
+    "source /home/argus/server/etc/common.prod.env; "
+    "source /home/argus/server/etc/server.prod.env; "
+    "source /home/argus/server/etc/secrets.env; "
+    "python /home/argus/server/src/tools/dyndns.py'"
+)
+
+certbot_job = (
+    "systemd-cat -t 'argus_certbot' "
+    "bash -c '. /home/argus/server/pyenv/bin/activate; "
+    "source /home/argus/server/etc/common.prod.env; "
+    "source /home/argus/server/etc/server.prod.env; "
+    "source /home/argus/server/etc/secrets.env; "
+    "python /home/argus/server/src/tools/certbot.py'"
+)
+
+
 def enable_dyndns_job(enable=True):
     try:
         argus_cron = CronTab(user="argus")
@@ -21,7 +40,7 @@ def enable_dyndns_job(enable=True):
     job = jobs[0] if len(jobs) > 0 else None
     if job is None:
         job = argus_cron.new(
-            command="systemd-cat -t 'argus_dyndns'  bash -c '. /home/argus/server/pyenv/bin/activate; source /home/argus/server/etc/common.prod.env; source /home/argus/server/etc/server.prod.env; source /home/argus/server/etc/secrets.env; python /home/argus/server/src/tools/dyndns.py'",
+            command=dyndns_job,
             comment="Update the IP address at the dynamic DNS provider",
         )
         job.hours.every(1)
@@ -40,7 +59,7 @@ def enable_certbot_job(enable=True):
     job = jobs[0] if len(jobs) > 0 else None
     if job is None:
         job = root_cron.new(
-            command="systemd-cat -t 'argus_certbot' bash -c '. /home/argus/server/pyenv/bin/activate; source /home/argus/server/etc/common.prod.env; source /home/argus/server/etc/server.prod.env; source /home/argus/server/etc/secrets.env; /home/argus/server/pyenv/bin/python /home/argus/server/src/tools/certbot.py'",
+            command=certbot_job,
             comment="Generate or update certificate with certbot",
         )
         job.day.every(1)
