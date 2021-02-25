@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# @Author: Gábor Kovács
+# @Date:   2021-02-25 20:04:25
+# @Last Modified by:   Gábor Kovács
+# @Last Modified time: 2021-02-25 20:04:27
 import logging
 import os
 import os.path

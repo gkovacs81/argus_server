@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# @Author: Gábor Kovács
+# @Date:   2021-02-25 20:05:29
+# @Last Modified by:   Gábor Kovács
+# @Last Modified time: 2021-02-25 20:05:31
 import json
 import logging
 from pydbus import SystemBus

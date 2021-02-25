@@ -1,8 +1,8 @@
-"""
-Created on 2018. jan. 29.
-
-@author: gkovacs
-"""
+# -*- coding: utf-8 -*-
+# @Author: Gábor Kovács
+# @Date:   2021-02-25 20:09:39
+# @Last Modified by:   Gábor Kovács
+# @Last Modified time: 2021-02-25 20:09:41
 
 
 class Output(object):

@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# @Author: Gábor Kovács
+# @Date:   2021-02-25 20:07:49
+# @Last Modified by:   Gábor Kovács
+# @Last Modified time: 2021-02-25 20:07:51
 import os
 
 from sqlalchemy.orm import scoped_session, sessionmaker

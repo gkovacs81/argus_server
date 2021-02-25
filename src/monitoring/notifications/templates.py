@@ -1,8 +1,8 @@
-"""
-Created on 2018. jan. 6.
-
-@author: gkovacs
-"""
+# -*- coding: utf-8 -*-
+# @Author: Gábor Kovács
+# @Date:   2021-02-25 20:08:24
+# @Last Modified by:   Gábor Kovács
+# @Last Modified time: 2021-02-25 20:08:26
 
 ALERT_STARTED_SMS = "Alert({id}) started at {time}!"
 ALERT_STARTED_EMAIL = """

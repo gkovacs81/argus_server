@@ -1,8 +1,9 @@
-"""
-Created on 2017. dec. 3.
+# -*- coding: utf-8 -*-
+# @Author: Gábor Kovács
+# @Date:   2021-02-25 20:07:57
+# @Last Modified by:   Gábor Kovács
+# @Last Modified time: 2021-02-25 20:07:58
 
-@author: gkovacs
-"""
 from logging import INFO
 
 

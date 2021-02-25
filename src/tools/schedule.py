@@ -1,8 +1,8 @@
-"""
-Created on 2018. ápr. 4.
-
-@author: gkovacs
-"""
+# -*- coding: utf-8 -*-
+# @Author: Gábor Kovács
+# @Date:   2021-02-25 20:05:23
+# @Last Modified by:   Gábor Kovács
+# @Last Modified time: 2021-02-25 20:05:26
 import logging
 
 from crontab import CronTab

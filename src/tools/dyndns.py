@@ -1,5 +1,9 @@
 #!/usr/bin/env python
-
+# -*- coding: utf-8 -*-
+# @Author: Gábor Kovács
+# @Date:   2021-02-25 20:04:45
+# @Last Modified by:   Gábor Kovács
+# @Last Modified time: 2021-02-25 20:05:17
 import json
 import logging
 import socket

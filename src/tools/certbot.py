@@ -1,10 +1,9 @@
 #!/usr/bin/env python
-"""
-Created on 2018. ápr. 16.
-
-@author: gkovacs
-"""
-
+# -*- coding: utf-8 -*-
+# @Author: Gábor Kovács
+# @Date:   2021-02-25 20:04:12
+# @Last Modified by:   Gábor Kovács
+# @Last Modified time: 2021-02-25 20:04:20
 import json
 import logging
 import subprocess

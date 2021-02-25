@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# @Author: Gábor Kovács
+# @Date:   2021-02-25 20:03:05
+# @Last Modified by:   Gábor Kovács
+# @Last Modified time: 2021-02-25 20:03:13
 import datetime
 import hashlib
 import json
