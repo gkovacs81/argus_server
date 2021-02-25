@@ -9,12 +9,11 @@ source etc/common.$1.env
 source etc/server.$1.env
 source etc/secrets.env
 
-if [ "$1" == "dev" ] || [ "$1" == "demo" ]; then
+if [ "$1" == "dev" ]; then
   pipenv sync --dev
   pipenv run printenv
   pipenv run flask run -h $SERVER_HOST -p $SERVER_PORT
 elif [ "$1" == "prod" ]; then
-  pipenv sync
   pipenv run gunicorn \
     --workers 2 \
     --umask 0117 \

@@ -9,6 +9,4 @@ source etc/common.$1.env
 source etc/server.$1.env
 source etc/secrets.env
 
-. ./$PYENV/bin/activate
-
-src/data.py -d -c -e $2
+pipenv run src/data.py -d -c -e $2

@@ -12,20 +12,20 @@ from monitoring.constants import LOG_IPC
 
 dyndns_job = (
     "systemd-cat -t 'argus_dyndns' "
-    "bash -c '. /home/argus/server/pyenv/bin/activate; "
+    "bash -c 'cd /home/argus/server/; "
     "source /home/argus/server/etc/common.prod.env; "
     "source /home/argus/server/etc/server.prod.env; "
     "source /home/argus/server/etc/secrets.env; "
-    "python /home/argus/server/src/tools/dyndns.py'"
+    "pipenv run python /home/argus/server/src/tools/dyndns.py'"
 )
 
 certbot_job = (
     "systemd-cat -t 'argus_certbot' "
-    "bash -c '. /home/argus/server/pyenv/bin/activate; "
+    "bash -c 'cd /home/argus/server/; "
     "source /home/argus/server/etc/common.prod.env; "
     "source /home/argus/server/etc/server.prod.env; "
     "source /home/argus/server/etc/secrets.env; "
-    "python /home/argus/server/src/tools/certbot.py'"
+    "pipenv run python /home/argus/server/src/tools/certbot.py'"
 )
 
 
