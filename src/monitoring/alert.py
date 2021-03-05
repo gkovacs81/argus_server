@@ -1,8 +1,9 @@
-"""
-Created on 2017. szept. 13.
+# -*- coding: utf-8 -*-
+# @Author: Gábor Kovács
+# @Date:   2021-02-25 20:08:04
+# @Last Modified by:   Gábor Kovács
+# @Last Modified time: 2021-02-25 20:08:04
 
-@author: gkovacs
-"""
 
 from datetime import datetime
 import logging
@@ -41,11 +42,19 @@ class SensorAlert(Thread):
         self._stop_event = stop_event
 
     def run(self):
-        self._logger.info("Alert (%s) started on sensor (id:%s) waiting %s sec before starting syren",
-                          self._alert_type, self._sensor_id, self._delay)
+        self._logger.info(
+            "Alert (%s) started on sensor (id:%s) waiting %s sec before starting syren",
+            self._alert_type,
+            self._sensor_id,
+            self._delay,
+        )
         if not self._stop_event.wait(self._delay):
-            self._logger.info("Start syren because not disarmed (%s) sensor (id:%s) in %s secs",
-                              self._alert_type, self._sensor_id, self._delay)
+            self._logger.info(
+                "Start syren because not disarmed (%s) sensor (id:%s) in %s secs",
+                self._alert_type,
+                self._sensor_id,
+                self._delay,
+            )
             SyrenAlert.start_syren(self._alert_type, SensorAlert._sensor_queue, self._stop_event)
             SensorAlert._sensor_queue.put(self._sensor_id)
             if self._alert_type == ALERT_SABOTAGE:
@@ -59,10 +68,10 @@ class SyrenAlert(Thread):
     """
     Handling of syren alerts.
     """
-    
+
     # default timing
-    ALERT_TIME = 600 # 10 minutes
-    SUSPEND_TIME = 300 # 5 minutes
+    ALERT_TIME = 600  # 10 minutes
+    SUSPEND_TIME = 300  # 5 minutes
 
     _semaphore = BoundedSemaphore()
     _alert = None
@@ -120,7 +129,6 @@ class SyrenAlert(Thread):
         self.stop_alert()
         self._db_session.close()
 
-
     def load_syren_config(self):
         syren_config = self._db_session.query(Option).filter_by(name="sysren", section="timing").first()
         if syren_config:
@@ -131,7 +139,6 @@ class SyrenAlert(Thread):
 
         SyrenAlert.ALERT_TIME = syren_config["alert_time"]
         SyrenAlert.SUSPEND_TIME = syren_config["suspend_time"]
-
 
     def start_alert(self):
         start_time = datetime.now(pytz.timezone("CET"))
@@ -145,11 +152,15 @@ class SyrenAlert(Thread):
         send_syren_state(True)
 
         self._logger.debug("Alerting sensors: %s", self._alert.sensors)
-        sensor_descriptions = list(map(lambda alert_sensor: f"{alert_sensor.sensor.description}(id:{alert_sensor.sensor.id}/CH{alert_sensor.sensor.channel+1})", self._alert.sensors))
+        sensor_descriptions = list(
+            map(
+                lambda item: f"{item.sensor.description}(id:{item.sensor.id}/CH{item.sensor.channel+1})",
+                self._alert.sensors,
+            )
+        )
         Notifier.notify_alert_started(self._alert.id, sensor_descriptions, start_time)
 
         self._logger.info("Alert started")
-
 
     def stop_alert(self):
         with SyrenAlert._semaphore:
@@ -164,7 +175,6 @@ class SyrenAlert(Thread):
             Notifier.notify_alert_stopped(self._alert.id, self._alert.end_time)
 
         self._logger.info("Alert stopped")
-
 
     def handle_sensors(self):
         sensor_added = False
@@ -181,9 +191,7 @@ class SyrenAlert(Thread):
 
                 if not already_added:
                     alert_sensor = AlertSensor(
-                        channel=sensor.channel,
-                        type_id=sensor.type_id,
-                        description=sensor.description
+                        channel=sensor.channel, type_id=sensor.type_id, description=sensor.description
                     )
                     alert_sensor.sensor = sensor
                     self._alert.sensors.append(alert_sensor)

@@ -1,4 +1,9 @@
-import os
+# -*- coding: utf-8 -*-
+# @Author: Gábor Kovács
+# @Date:   2021-02-25 20:09:45
+# @Last Modified by:   Gábor Kovács
+# @Last Modified time: 2021-02-25 20:09:47
+
 import logging
 
 from time import time
@@ -32,7 +37,6 @@ class TimeBasedMockMCP3008(object):
 
 
 class PatternBasedMockMCP3008(object):
-
     def __init__(self, channel=None, clock_pin=None, mosi_pin=None, miso_pin=None, select_pin=None):
         self._channel = channel
         self._logger = logging.getLogger(LOG_ADSENSOR)
@@ -45,15 +49,19 @@ class PatternBasedMockMCP3008(object):
     @property
     def value(self):
         try:
-            # self._logger.debug("Values from %s (channel: %s): %s", self.__class__.__name__, self._channel, self._alert_source[self.i])
+            self._logger.debug(
+                "Values from %s (channel: %s): %s", self.__class__.__name__, self._channel, self._alert_source[self.i]
+            )
             value = self._alert_source[self.i][self._channel]
         except (KeyError, TypeError, IndexError):
             value = 0
-            self._logger.debug("No value for channel=%s on clock=%s in %s!", self._channel, self.i, self.__class__.__name__)
+            self._logger.debug(
+                "No value for channel=%s on clock=%s in %s!", self._channel, self.i, self.__class__.__name__
+            )
 
         # step clock
         self.i += 1
-        if self. i == len(self._alert_source):
+        if self.i == len(self._alert_source):
             self.i = 0
 
         return value
@@ -72,7 +80,6 @@ class ShortAlertMCP3008(PatternBasedMockMCP3008):
         [0],
         [0],
         [0],
-
         [1],
         [1],
         [1],
@@ -83,7 +90,6 @@ class ShortAlertMCP3008(PatternBasedMockMCP3008):
         [1],
         [1],
         [1],
-
         [0],
         [0],
         [0],
@@ -93,12 +99,13 @@ class ShortAlertMCP3008(PatternBasedMockMCP3008):
         [0],
         [0],
         [0],
-        [0]
+        [0],
     ]
 
     def __init__(self, *args, **kwargs):
         super(ShortAlertMCP3008, self).__init__(*args, **kwargs)
         self._alert_source = ShortAlertMCP3008.SHORT_ALERT
+
 
 class DoubleAlertMCP3008(PatternBasedMockMCP3008):
 
@@ -113,7 +120,6 @@ class DoubleAlertMCP3008(PatternBasedMockMCP3008):
         [0, 0],
         [0, 0],
         [0, 0],
-
         [1, 0],
         [1, 0],
         [1, 0],
@@ -124,7 +130,6 @@ class DoubleAlertMCP3008(PatternBasedMockMCP3008):
         [1, 1],
         [1, 1],
         [1, 1],
-
         [1, 1],
         [1, 1],
         [0, 1],
@@ -134,7 +139,7 @@ class DoubleAlertMCP3008(PatternBasedMockMCP3008):
         [0, 0],
         [0, 0],
         [0, 0],
-        [0, 0]
+        [0, 0],
     ]
 
     def __init__(self, *args, **kwargs):
@@ -164,7 +169,7 @@ class PowerMCP3008(PatternBasedMockMCP3008):
         [0, 0, 0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0]
+        [0, 0, 0, 0, 0, 0, 0, 0],
     ]
 
     def __init__(self, *args, **kwargs):

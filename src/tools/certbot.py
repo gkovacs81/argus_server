@@ -1,10 +1,9 @@
 #!/usr/bin/env python
-"""
-Created on 2018. ápr. 16.
-
-@author: gkovacs
-"""
-
+# -*- coding: utf-8 -*-
+# @Author: Gábor Kovács
+# @Date:   2021-02-25 20:04:12
+# @Last Modified by:   Gábor Kovács
+# @Last Modified time: 2021-02-25 20:04:20
 import json
 import logging
 import subprocess
@@ -21,7 +20,6 @@ from tools.dictionary import filter_keys
 
 
 class Certbot:
-
     def __init__(self, logger=None):
         self._logger = logger if logger else logging.getLogger(LOG_SC_CERTBOT)
         self._db_session = Session()
@@ -39,7 +37,7 @@ class Certbot:
             return
 
         tmp_config = copy(noip_config)
-        filter_keys(tmp_config, ['password'])
+        filter_keys(tmp_config, ["password"])
         self._logger.info("Generate certificate with options: %s", tmp_config)
 
         try:
@@ -54,12 +52,13 @@ class Certbot:
                     "--agree-tos",
                     "--non-interactive",
                     "--quiet",
-                    "--cert-name", "arpi",
+                    "--cert-name",
+                    "arpi",
                     "--email",
                     noip_config["username"],
-                    "-d %s" % noip_config["hostname"]
+                    "-d %s" % noip_config["hostname"],
                 ],
-                capture_output=True
+                capture_output=True,
             )
             if results.returncode:
                 self._logger.error("Certbot problem: %s", results.stderr.decode("utf-8"))
@@ -76,14 +75,8 @@ class Certbot:
         try:
             # non interactive
             results = subprocess.run(
-                [
-                    "/usr/bin/certbot",
-                    "renew",
-                    "--non-interactive",
-                    "--quiet",
-                    "--cert-name", "arpi"
-                ],
-                capture_output=True
+                ["/usr/bin/certbot", "renew", "--non-interactive", "--quiet", "--cert-name", "arpi"],
+                capture_output=True,
             )
             if results.returncode:
                 self._logger.error("Certbot problem: %s", results.stderr.decode("utf-8"))
@@ -98,7 +91,9 @@ class Certbot:
         """
         self._logger.info("Switch nginx to use certbot certificates")
         Path("/usr/local/nginx/conf/snippets/certificates.conf").unlink()
-        symlink("/usr/local/nginx/conf/snippets/certbot-signed.conf", "/usr/local/nginx/conf/snippets/certificates.conf")
+        symlink(
+            "/usr/local/nginx/conf/snippets/certbot-signed.conf", "/usr/local/nginx/conf/snippets/certificates.conf"
+        )
 
     def restart_nginx(self):
         """
@@ -122,11 +117,15 @@ class Certbot:
             self.generate_certificate()
 
         if full_certificate.is_file():
-            if Path("/usr/local/nginx/conf/snippets/certificates.conf").resolve() == PosixPath("/usr/local/nginx/conf/snippets/self-signed.conf"):
+            if Path("/usr/local/nginx/conf/snippets/certificates.conf").resolve() == PosixPath(
+                "/usr/local/nginx/conf/snippets/self-signed.conf"
+            ):
                 self._logger.info("NGINX uses self-signed certificates")
                 self.swith2certbot()
                 self.restart_nginx()
-            elif Path("/usr/local/nginx/conf/snippets/certificates.conf").resolve() == PosixPath("/usr/local/nginx/conf/snippets/certbot-signed.conf"):
+            elif Path("/usr/local/nginx/conf/snippets/certificates.conf").resolve() == PosixPath(
+                "/usr/local/nginx/conf/snippets/certbot-signed.conf"
+            ):
                 self._logger.info("Using certbot certificates")
             else:
                 self._logger.info("Error detecting certificate configuration")
@@ -136,6 +135,6 @@ class Certbot:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(format='%(asctime)-15s %(message)s', level=logging.INFO)
+    logging.basicConfig(format="%(asctime)-15s %(message)s", level=logging.INFO)
 
     Certbot(logging.getLogger("argus_certbot")).update_certificates()

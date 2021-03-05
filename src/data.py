@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+# @Author: Gábor Kovács
+# @Date:   2021-02-25 20:03:47
+# @Last Modified by:   Gábor Kovács
+# @Last Modified time: 2021-02-25 20:03:53
 import argparse
 
 from sqlalchemy.exc import ProgrammingError
@@ -13,13 +16,14 @@ from models import metadata
 
 
 SENSOR_TYPES = [
-    SensorType(1, name='Motion', description='Detect motion'),
-    SensorType(2, name='Tamper', description='Detect sabotage'),
-    SensorType(3, name='Open', description='Detect opening'),
-    SensorType(4, name='Break', description='Detect glass break')
+    SensorType(1, name="Motion", description="Detect motion"),
+    SensorType(2, name="Tamper", description="Detect sabotage"),
+    SensorType(3, name="Open", description="Detect opening"),
+    SensorType(4, name="Break", description="Detect glass break"),
 ]
 
 session = Session()
+
 
 def cleanup():
     print("Clean up database...")
@@ -42,7 +46,7 @@ def env_prod():
     session.add_all(SENSOR_TYPES)
     print(" - Created sensor types")
 
-    kt1 = KeypadType(1, 'DSC', 'DSC keybus (DSC PC-1555RKZ)')
+    kt1 = KeypadType(1, "DSC", "DSC keybus (DSC PC-1555RKZ)")
     session.add_all([kt1])
     print(" - Created keypad types")
 
@@ -54,10 +58,12 @@ def env_prod():
 
 
 def env_live_01():
-    session.add_all([
-        User(name="Administrator", role=ROLE_ADMIN, access_code="1234"),
-        User(name="Chuck.Norris", role=ROLE_USER, access_code="1111")
-    ])
+    session.add_all(
+        [
+            User(name="Administrator", role=ROLE_ADMIN, access_code="1234"),
+            User(name="Chuck.Norris", role=ROLE_USER, access_code="1111"),
+        ]
+    )
     print(" - Created users")
 
     z1 = Zone(name="No delay", description="Alert with no delay")
@@ -83,7 +89,7 @@ def env_live_01():
     session.add_all([s1, s2, s3, s4, s5, s6, s7, s8])
     print(" - Created sensors")
 
-    kt1 = KeypadType(1, 'DSC', 'DSC keybus (DSC PC-1555RKZ)')
+    kt1 = KeypadType(1, "DSC", "DSC keybus (DSC PC-1555RKZ)")
     session.add_all([kt1])
     print(" - Created keypad types")
 
@@ -97,10 +103,7 @@ def env_live_01():
 def env_test_01():
     admin_user = User(name="Administrator", role=ROLE_ADMIN, access_code="1234")
     admin_user.add_registration_code("123")
-    session.add_all([
-        admin_user,
-        User(name="Chuck Norris", role=ROLE_USER, access_code="1111")
-    ])
+    session.add_all([admin_user, User(name="Chuck Norris", role=ROLE_USER, access_code="1111")])
     print(" - Created users")
 
     z1 = Zone(name="No delay", description="Alert with no delay")
@@ -120,7 +123,7 @@ def env_test_01():
     session.add_all([s1, s2, s3])
     print(" - Created sensors")
 
-    kt1 = KeypadType(1, 'DSC', 'DSC keybus (DSC PC-1555RKZ)')
+    kt1 = KeypadType(1, "DSC", "DSC keybus (DSC PC-1555RKZ)")
     session.add_all([kt1])
     print(" - Created keypad types")
 
@@ -134,12 +137,12 @@ def env_test_01():
 def main():
     environments = []
     for attribute, value in globals().items():
-        if attribute.startswith('env_'):
-            environments.append(attribute.replace('env_', ''))
+        if attribute.startswith("env_"):
+            environments.append(attribute.replace("env_", ""))
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--create", action='store_true', help="Create database content")
-    parser.add_argument("-d", "--delete", action='store_true', help="Delete database content")
+    parser.add_argument("-c", "--create", action="store_true", help="Create database content")
+    parser.add_argument("-d", "--delete", action="store_true", help="Delete database content")
     parser.add_argument("-e", "--environment", required=True, help="/".join(environments), metavar="environment")
     args = parser.parse_args()
 
@@ -147,11 +150,11 @@ def main():
         cleanup()
 
     if args.create:
-        create_method = globals()['env_' + args.environment]
+        create_method = globals()["env_" + args.environment]
         print("Creating '%s' environment..." % args.environment)
         create_method()
         print("Environment create")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

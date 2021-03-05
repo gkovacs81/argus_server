@@ -9,6 +9,7 @@ flask = "==1.1.2"
 flask-migrate = "==2.6.0"
 flask-script = "==2.0.6"
 flask-sqlalchemy = "==2.4.4"
+gobject = "==0.1.0"
 gpiozero = "==1.5.1"
 gunicorn = "==20.0.4"
 noipy = "==1.5.3"
@@ -25,8 +26,8 @@ stringcase = "==1.2.0"
 
 [dev-packages]
 flake8 = "*"
-autopep8 = "*"
 rope = "*"
+black = "*"
 
 [requires]
-python_version = "3.8"
+python_version = "3"

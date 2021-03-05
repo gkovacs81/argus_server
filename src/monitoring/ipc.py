@@ -1,8 +1,9 @@
-"""
-Created on 2017. szept. 7.
+# -*- coding: utf-8 -*-
+# @Author: Gábor Kovács
+# @Date:   2021-02-25 20:07:43
+# @Last Modified by:   Gábor Kovács
+# @Last Modified time: 2021-02-25 20:07:45
 
-@author: gkovacs
-"""
 import json
 import logging
 import socket
@@ -10,11 +11,22 @@ from os import chmod, chown, environ, makedirs, path, remove
 from threading import Thread
 
 from monitoring import storage
-from monitoring.constants import (LOG_IPC, MONITOR_ARM_AWAY, MONITOR_ARM_STAY,
-                                  MONITOR_DISARM, POWER_GET_STATE, MONITOR_SET_CLOCK,
-                                  MONITOR_SYNC_CLOCK, MONITOR_UPDATE_CONFIG,
-                                  UPDATE_SECURE_CONNECTION, MONITOR_UPDATE_KEYPAD,
-                                  THREAD_IPC, MONITOR_GET_ARM, MONITOR_GET_STATE, UPDATE_SSH)
+from monitoring.constants import (
+    LOG_IPC,
+    MONITOR_ARM_AWAY,
+    MONITOR_ARM_STAY,
+    MONITOR_DISARM,
+    POWER_GET_STATE,
+    MONITOR_SET_CLOCK,
+    MONITOR_SYNC_CLOCK,
+    MONITOR_UPDATE_CONFIG,
+    UPDATE_SECURE_CONNECTION,
+    MONITOR_UPDATE_KEYPAD,
+    THREAD_IPC,
+    MONITOR_GET_ARM,
+    MONITOR_GET_STATE,
+    UPDATE_SSH,
+)
 from tools.clock import Clock
 from tools.connection import SecureConnection
 from tools.ssh import SSH
@@ -65,17 +77,15 @@ class IPCServer(Thread):
             makedirs(path.dirname(filename))
 
     def handle_actions(self, message):
-        '''
+        """
         Return value:
         {
             "result": boolean, # True if succeded
             "message": string, # Error message
             "value: dict # value to return
         }
-        '''
-        return_value = {
-            "result": True
-        }
+        """
+        return_value = {"result": True}
         if message["action"] == MONITOR_ARM_AWAY:
             self._logger.info("Action: arm AWAY")
             self._broadcaster.send_message(MONITOR_ARM_AWAY)

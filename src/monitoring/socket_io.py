@@ -1,8 +1,8 @@
-"""
-Created on 2017. szept. 23.
-
-@author: gkovacs
-"""
+# -*- coding: utf-8 -*-
+# @Author: Gábor Kovács
+# @Date:   2021-02-25 20:07:27
+# @Last Modified by:   Gábor Kovács
+# @Last Modified time: 2021-02-25 20:07:29
 
 import json
 import logging
@@ -22,7 +22,7 @@ from monitoring.database import Session
 
 session = Session()
 
-noip_config = session.query(Option).filter_by(name='network', section='dyndns').first()
+noip_config = session.query(Option).filter_by(name="network", section="dyndns").first()
 if noip_config:
     noip_config = json.loads(noip_config.value)
 
@@ -34,10 +34,7 @@ else:
 if len(allowed_origins) == 1:
     allowed_origins = allowed_origins[0]
 
-sio = socketio.Server(
-        async_mode="threading",
-        cors_allowed_origins=allowed_origins
-)
+sio = socketio.Server(async_mode="threading", cors_allowed_origins=allowed_origins)
 logger = logging.getLogger(LOG_SOCKETIO)
 logging.getLogger("werkzeug").setLevel(logging.DEBUG)
 
@@ -61,9 +58,7 @@ def connect(sid, environ):
     query_string = parse_qs(environ["QUERY_STRING"])
     remote_address = environ.get("HTTP_X_REAL_IP", environ.get("REMOTE_ADDR", ""))
     try:
-        device_info = jwt.decode(
-            query_string["token"][0], os.environ.get("SECRET"), algorithms="HS256"
-        )
+        device_info = jwt.decode(query_string["token"][0], os.environ.get("SECRET"), algorithms="HS256")
         logger.info("Connecting with device info: %s", device_info)
 
         # TODO: the client IP can change for mobile devices!?
@@ -73,7 +68,7 @@ def connect(sid, environ):
 
         referer = urlparse(environ["HTTP_REFERER"])
         origin = urlparse(device_info["origin"])
-        
+
         if origin.scheme != referer.scheme or origin.netloc != referer.netloc:
             logger.info("Authentication failed from origin '%s'!= '%s'", origin, referer)
             return False
@@ -109,12 +104,11 @@ def send_syren_state(syren_state):
 def send_system_state_change(system_state):
     send_message("system_state_change", system_state)
 
+
 def send_power_state_change(power_state):
     send_message("power_state_change", power_state)
 
 
 def send_message(message_type, message):
-    logging.getLogger("SocketIO").debug(
-        "Sending message: %s -> %s", message_type, message
-    )
+    logging.getLogger("SocketIO").debug("Sending message: %s -> %s", message_type, message)
     sio.emit(message_type, message)

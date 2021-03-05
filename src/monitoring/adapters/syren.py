@@ -1,8 +1,8 @@
-'''
-Created on 2017. aug. 28.
-
-@author: gkovacs
-'''
+# -*- coding: utf-8 -*-
+# @Author: Gábor Kovács
+# @Date:   2021-02-25 20:08:45
+# @Last Modified by:   Gábor Kovács
+# @Last Modified time: 2021-02-25 20:08:46
 
 import logging
 import os
@@ -11,21 +11,21 @@ from monitoring.adapters import SYREN_OUT
 from monitoring.constants import LOG_ADSYREN
 
 # check if running on Raspberry
-if os.uname()[4][:3] == 'arm':
+if os.uname()[4][:3] == "arm":
     from gpiozero.output_devices import DigitalOutputDevice
 else:
     from monitoring.adapters.mock.output import Output as DigitalOutputDevice
 
 
 class SyrenAdapter(object):
-    '''
+    """
     classdocs
-    '''
+    """
 
     def __init__(self):
-        '''
+        """
         Constructor
-        '''
+        """
         self._channels = []
         self._logger = logging.getLogger(LOG_ADSYREN)
         self._is_alerting = False

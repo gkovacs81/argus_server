@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# @Author: Gábor Kovács
+# @Date:   2021-02-25 20:10:08
+# @Last Modified by:   Gábor Kovács
+# @Last Modified time: 2021-02-25 20:10:08
 
 import logging
 from datetime import datetime
@@ -21,13 +26,13 @@ VOID = 0xFF
 
 class Lights:
     BACKLIGHT = 0b10000000  # 0x80
-    FIRE = 0b01000000       # 0x40
-    PROGRAM = 0b00100000    # 0x20
-    ERROR = 0b00010000      # 0x10
-    BYPASS = 0b00001000     # 0x08
-    MEMORY = 0b00000100     # 0x04
-    ARMED = 0b00000010      # 0x02
-    READY = 0b00000001      # 0x01
+    FIRE = 0b01000000  # 0x40
+    PROGRAM = 0b00100000  # 0x20
+    ERROR = 0b00010000  # 0x10
+    BYPASS = 0b00001000  # 0x08
+    MEMORY = 0b00000100  # 0x04
+    ARMED = 0b00000010  # 0x02
+    READY = 0b00000001  # 0x01
 
     def __init__(self):
         self.backlight = True
@@ -62,7 +67,7 @@ class Lights:
 
 class Buttons:
     codes = {
-        0X00: "0",
+        0x00: "0",
         0x05: "1",
         0x0A: "2",
         0x0F: "3",
@@ -75,7 +80,7 @@ class Buttons:
         0x28: "*",
         0x2D: "#",
         0xAF: "Stay",
-        0xB1: "Away"
+        0xB1: "Away",
     }
 
     @staticmethod
@@ -188,9 +193,9 @@ class DSCKeypad(KeypadBase):
             self._start_time = time()
 
     def send_command_with_retry(self, method, param=None):
-        '''
+        """
         Not use, can be later deleted
-        '''
+        """
         BIT_PERIOD = 0.0015
         start_time = time()
         sent_bytes = self.send_command(method, param)
@@ -219,7 +224,7 @@ class DSCKeypad(KeypadBase):
             pass
 
         if self._line.conversation[2]["received"] != VOID:
-            self.pressed = Buttons.get_button(self._line.conversation[2]['received'])
+            self.pressed = Buttons.get_button(self._line.conversation[2]["received"])
 
         sent_bytes = len(self._line.conversation) - 1  # remove 9. bit
         self.print_communication()
@@ -244,50 +249,43 @@ class DSCKeypad(KeypadBase):
         elif count == 6:
             param == 0x0C
 
-        self._line.send_and_receive(self.add_CRC([
-            self.BEEP,
-            param
-        ]))
+        self._line.send_and_receive(self.add_CRC([self.BEEP, param]))
 
     def send_keybus_query(self):
         self._logger.info("KEYBUS QUERY 0x%0X" % self.KEYBUS_QUERY)
-        self._line.send_and_receive([
-            self.KEYBUS_QUERY,
-            PLACEHOLDER,
-            PLACEHOLDER,
-            PLACEHOLDER,
-            PLACEHOLDER,
-            PLACEHOLDER,
-            PLACEHOLDER,
-            PLACEHOLDER,
-            PLACEHOLDER,
-            PLACEHOLDER,
-            PLACEHOLDER,
-            PLACEHOLDER
-        ])
+        self._line.send_and_receive(
+            [
+                self.KEYBUS_QUERY,
+                PLACEHOLDER,
+                PLACEHOLDER,
+                PLACEHOLDER,
+                PLACEHOLDER,
+                PLACEHOLDER,
+                PLACEHOLDER,
+                PLACEHOLDER,
+                PLACEHOLDER,
+                PLACEHOLDER,
+                PLACEHOLDER,
+                PLACEHOLDER,
+            ]
+        )
 
     def send_partition_status(self):
         self._logger.debug("PARTITION STATUS 0x%0X" % self.PARTITION_STATUS)
         led_status = self._lights.get_lights()
-        self._line.send_and_receive([
-            self.PARTITION_STATUS,
-            led_status,
-            0x01,
-            UNKNOWN_DATA,
-            PARTITION_DISABLED
-        ])
+        self._line.send_and_receive([self.PARTITION_STATUS, led_status, 0x01, UNKNOWN_DATA, PARTITION_DISABLED])
 
     def send_zone_status(self):
         self._logger.debug("ZONE STATUS 0x%0X" % self.ZONE_STATUS)
         led_status = self._lights.get_lights()
-        self._line.send_and_receive(self.add_CRC([self.ZONE_STATUS, led_status, 0x01, UNKNOWN_DATA, 0XC7, 0x02]))
+        self._line.send_and_receive(self.add_CRC([self.ZONE_STATUS, led_status, 0x01, UNKNOWN_DATA, 0xC7, 0x02]))
 
     def send_datetime(self):
         timestamp = datetime.now()
         self._logger.debug("DATETIME 0x%0X => %s" % (self.DATETIME_STATUS, timestamp.isoformat()))
 
-        b1 = (int((timestamp.year-2000)/10) << 4)
-        b1 |= (0x0F & ((timestamp.year-2000) % 10))
+        b1 = int((timestamp.year - 2000) / 10) << 4
+        b1 |= 0x0F & ((timestamp.year - 2000) % 10)
         b2 = 0x3C & (timestamp.month << 2)
         b2 |= (timestamp.day & 0b00011000) >> 3
         b3 = (timestamp.day & 0b00000111) << 5

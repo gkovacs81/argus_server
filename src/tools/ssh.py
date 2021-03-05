@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+# @Author: Gábor Kovács
+# @Date:   2021-02-25 20:05:29
+# @Last Modified by:   Gábor Kovács
+# @Last Modified time: 2021-02-25 20:05:31
 import json
 import logging
 from pydbus import SystemBus
@@ -9,13 +14,12 @@ from gi.repository import GLib
 from monitoring.database import Session
 
 
-class SSH():
+class SSH:
     def __init__(self):
         super(SSH, self).__init__()
         self._logger = logging.getLogger(LOG_SC_ACCESS)
         self._db_session = Session()
         self._bus = SystemBus()
-
 
     def update_ssh_service(self):
         ssh_config = self._db_session.query(Option).filter_by(name="network", section="access").first()
@@ -39,7 +43,6 @@ class SSH():
             systemd[".Manager"].EnableUnitFiles(["ssh.service"], False, True)
         except GLib.Error as error:
             self._logger.error("Failed: %s", error)
-        
 
     def stop_ssh(self):
         self._logger.info("Stopping SSH")
@@ -50,4 +53,3 @@ class SSH():
             systemd[".Manager"].DisableUnitFiles(["ssh.service"], False)
         except GLib.Error as error:
             self._logger.error("Failed: %s", error)
-        

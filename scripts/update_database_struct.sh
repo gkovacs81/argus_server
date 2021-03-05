@@ -9,8 +9,6 @@ source etc/common.$1.env
 source etc/server.$1.env
 source etc/secrets.env
 
-. ./$PYENV/bin/activate
-
-src/manage.py db init
-src/manage.py db migrate
-src/manage.py db upgrade
+pipenv run src/manage.py db init
+pipenv run src/manage.py db migrate
+pipenv run src/manage.py db upgrade
