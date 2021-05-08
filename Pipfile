@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-eventlet = "==0.30.1"
+eventlet = "==0.31.0"
 flask = "==1.1.2"
 flask-migrate = "==2.6.0"
 flask-script = "==2.0.6"
